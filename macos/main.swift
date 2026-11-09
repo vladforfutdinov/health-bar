@@ -62,7 +62,7 @@ enum Glyph {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    private var statusItem: NSStatusItem!
     private let fetcher = StatusFetcher()
     private var config = Config.default
     private var configError: String?
@@ -78,6 +78,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #if SPARKLE
         updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
         #endif
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.autosaveName = "HealthBar"
         setIcon(.unknown, label: "loading")
         loadConfig()
         NSWorkspace.shared.notificationCenter.addObserver(
@@ -124,8 +126,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setIcon(_ state: IconState, label: String) {
         guard let button = statusItem.button else { return }
         button.image = Glyph(state).image()
-        button.setAccessibilityLabel("HealthBar: \(label)")
-        button.toolTip = "HealthBar"
+        // Menu bar managers (Thaw, Ice, Bartender) key items by this label; a changing one reads as a new item.
+        button.setAccessibilityLabel("HealthBar")
+        button.setAccessibilityValue(label)
+        button.toolTip = "HealthBar: \(label)"
     }
 
     // MARK: Menu
@@ -164,36 +168,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         switch result {
         case nil:
-            item.title = "\(service.name) — updating…"
-            item.image = Glyph(.unknown).image(size: 12)
+            setTitle(item, "\(service.name) — updating…", Glyph(.unknown))
             sub.addItem(open("Open Status Page", service.url))
         case .failure(let error):
-            item.attributedTitle = NSAttributedString(
-                string: "\(service.name) — unreachable",
-                attributes: [.foregroundColor: NSColor.secondaryLabelColor])
-            item.image = Glyph(.unknown).image(size: 12)
+            setTitle(item, "\(service.name) — unreachable", Glyph(.unknown), color: .secondaryLabelColor)
             sub.addItem(disabled(error.localizedDescription))
             sub.addItem(.separator())
             sub.addItem(open("Open Status Page", service.url))
         case .success(let status):
-            item.title = "\(service.name) — \(status.description)"
-            item.image = Glyph(status.level).image(size: 12)
+            setTitle(item, "\(service.name) — \(status.description)", Glyph(status.level))
             for incident in status.incidents {
-                let row = open("\(incident.name) — \(incident.stage)", incident.url)
-                row.image = Glyph(incident.level).image(size: 12)
+                let row = open("", incident.url)
+                setTitle(row, "\(incident.name) — \(incident.stage)", Glyph(incident.level))
                 row.toolTip = incident.lastUpdate
                 sub.addItem(row)
             }
             if !status.incidents.isEmpty { sub.addItem(.separator()) }
             for component in status.items {
-                let row = open(componentTitle(component), status.pageURL)
-                row.image = Glyph(component.level).image(size: 12)
+                let row = open("", status.pageURL)
+                setTitle(row, componentTitle(component), Glyph(component.level))
                 sub.addItem(row)
             }
             if !status.items.isEmpty { sub.addItem(.separator()) }
             sub.addItem(open("Open Status Page", status.pageURL))
         }
         return item
+    }
+
+    /// Glyph goes into the title, not `NSMenuItem.image`: macOS 27 menus don't draw item images.
+    private func setTitle(_ item: NSMenuItem, _ text: String, _ glyph: Glyph, color: NSColor? = nil) {
+        let font = NSFont.menuFont(ofSize: 0)
+        let dot = NSTextAttachment()
+        dot.image = glyph.image(size: 12)
+        dot.bounds = NSRect(x: 0, y: (font.capHeight - 12) / 2, width: 12, height: 12)
+        var attrs: [NSAttributedString.Key: Any] = [.font: font]
+        if let color { attrs[.foregroundColor] = color }
+        let title = NSMutableAttributedString(attachment: dot)
+        title.append(NSAttributedString(string: "  " + text, attributes: attrs))
+        item.title = text
+        item.attributedTitle = title
     }
 
     private func componentTitle(_ c: Item) -> String {
