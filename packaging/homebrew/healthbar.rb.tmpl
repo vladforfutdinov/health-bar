@@ -1,0 +1,18 @@
+cask "healthbar" do
+  version "__VERSION__"
+  sha256 "__SHA256__"
+
+  url "https://github.com/__REPO_SLUG__/releases/download/v#{version}/HealthBar.dmg"
+  name "HealthBar"
+  desc "Menu bar status of the services you depend on"
+  homepage "https://github.com/__REPO_SLUG__"
+
+  depends_on macos: :ventura
+
+  app "HealthBar.app"
+
+  zap trash: [
+    "~/Library/Application Support/HealthBar",
+    "~/Library/Preferences/__BUNDLE_ID__.plist",
+  ]
+end

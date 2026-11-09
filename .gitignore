@@ -1,0 +1,5 @@
+.sparkle/
+dist/
+build/
+.build/
+scripts/identity.env

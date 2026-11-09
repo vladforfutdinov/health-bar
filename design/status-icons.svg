@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="88" height="16" viewBox="0 0 88 16">
+  <g id="ok"><circle cx="8" cy="8" r="6.5" fill="#34C759"/></g>
+  <g id="degraded" transform="translate(24 0)"><circle cx="8" cy="8" r="5.75" fill="none" stroke="#FF9500" stroke-width="1.5"/><path d="M8 2.25A5.75 5.75 0 0 1 8 13.75Z" fill="#FF9500"/></g>
+  <g id="outage" transform="translate(48 0)"><circle cx="8" cy="8" r="5.75" fill="none" stroke="#FF3B30" stroke-width="1.5"/></g>
+  <g id="unknown" transform="translate(72 0)"><circle cx="8" cy="8" r="5.75" fill="none" stroke="#8E8E93" stroke-width="1.5" stroke-dasharray="2.2 2.2"/></g>
+</svg>
