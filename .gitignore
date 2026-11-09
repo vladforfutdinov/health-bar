@@ -3,3 +3,4 @@ dist/
 build/
 .build/
 scripts/identity.env
+.DS_Store

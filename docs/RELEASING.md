@@ -6,6 +6,8 @@ Manual `workflow_dispatch` runs without `release` build ad-hoc, skip notarizatio
 
 ## One-time: repository secrets
 
+`scripts/setup-github.sh` does all of this section and the variables below: creates the tap repo, generates the Sparkle key pair (login keychain, account `healthbar`) and the tap deploy key, and copies the Developer ID and notarization secrets from the reLayout repo through a throwaway workflow there. Idempotent; `FORCE=1` re-creates existing secrets. The manual steps below are the fallback.
+
 Settings, Secrets and variables, Actions, **Secrets**.
 
 ### Developer ID certificate
@@ -70,7 +72,7 @@ Optional `docs/release-notes/vX.Y.Z.md`, committed before the tag, is prepended 
 
 ## App icon
 
-The build looks for `Resources/AppIcon.icns`; if present it is copied into the bundle and `CFBundleIconFile` is set, otherwise the app ships without an icon. Add the file to get one.
+The build copies `Resources/AppIcon.icns` into the bundle and sets `CFBundleIconFile`. The `.icns` is generated from `design/path25.svg`; after editing the SVG run `scripts/make-icon.sh` (needs Inkscape) and commit both.
 
 ## Cutting a release
 
