@@ -3,24 +3,18 @@
     <channel>
         <title>HealthBar</title>
         <item>
-            <title>0.3.0</title>
-            <pubDate>Tue, 10 Nov 2026 22:59:11 +0000</pubDate>
-            <sparkle:version>28</sparkle:version>
-            <sparkle:shortVersionString>0.3.0</sparkle:shortVersionString>
+            <title>0.3.1</title>
+            <pubDate>Tue, 10 Nov 2026 23:05:31 +0000</pubDate>
+            <sparkle:version>29</sparkle:version>
+            <sparkle:shortVersionString>0.3.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description><![CDATA[<h2>What's new</h2>
+            <description><![CDATA[<h2>Changes</h2>
 <ul>
-<li><strong>Settings window</strong> (menu → Settings…, ⌘,): pick services from a built-in list of about 60 developer-service status pages in groups, add any Statuspage or incident.io page by its address, create and rename groups, reorder by drag or from the context menu, and set the poll interval, Launch at Login and update options. Changes apply at once.</li>
-<li><strong>Services outside groups</strong>, editing and deleting services and groups with confirmation, full keyboard control of the list.</li>
-<li><strong>Many services</strong>: the menu shows eight and a half services and scrolls the rest; the menu bar icon caps at 10 sectors, with problems shown in proportion.</li>
-<li><strong>Incidents and errors in the menu</strong>: a service with an active incident or a fetch error gets a third line under its strip. Pages that publish no uptime history say so instead of showing an empty strip.</li>
-<li><strong>About HealthBar</strong> in the menu.</li>
-<li><strong>Accessibility</strong>: VoiceOver labels for services and the menu bar icon; with Differentiate without color on, the icon marks problems with <code class="notranslate">!</code> / <code class="notranslate">~</code>.</li>
-<li>New app icon.</li>
-</ul>
-<p>Settings now live in the app; an existing <code class="notranslate">services.json</code> is imported once on first launch.</p>]]></description>
-            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.3.0/HealthBar.zip" length="1618990" type="application/octet-stream" sparkle:edSignature="oXkuQA8NRmfoA+2tclvFLQvkQQ7KLWQNJpkwUSAr0enNv5TXSdJMMYFHm/anORJUIvC3CBtKLkKZ9ZVpQQpbAw=="/>
+<li>The services list in the menu uses the standard scroll bar, shown while scrolling, and the next row's strip edge peeks out to show there is more.</li>
+<li>Pages without uptime history show a faint strip under "No uptime history".</li>
+</ul>]]></description>
+            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.3.1/HealthBar.zip" length="1619377" type="application/octet-stream" sparkle:edSignature="jqiNoHcxhQv9ON8p+zzC5y8ayccmo2NiJwA8bbakP9EYpXNuB+hIbsMXo0z7wLDBDy8bgUvyjLX7eo81cKcKBw=="/>
         </item>
     </channel>
 </rss>
