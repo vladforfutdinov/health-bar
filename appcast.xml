@@ -4,12 +4,12 @@
         <title>HealthBar</title>
         <item>
             <title>0.1.0</title>
-            <pubDate>Mon, 09 Nov 2026 23:59:03 +0000</pubDate>
+            <pubDate>Tue, 10 Nov 2026 00:16:33 +0000</pubDate>
             <sparkle:version>4</sparkle:version>
             <sparkle:shortVersionString>0.1.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.1.0/HealthBar.zip" length="1299482" type="application/octet-stream" sparkle:edSignature="aptnKI/KggIinbjTcuTvrFgSaYc/xtpET9GEsfgsC9pxR7tQUejA+cEZ2AhFXvndxZoNtfnd9isWnCt4pFbgBg=="/>
+            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.1.0/HealthBar.zip" length="1299410" type="application/octet-stream" sparkle:edSignature="l1ooIZGlTSJ9roPIZ8kPUeR+dG3Ecf+rs6LJ2Xk2pMXvopRcKCJk0jxOZazmqTPIqiDa+wr1yh4/aW5jcp8yCA=="/>
         </item>
     </channel>
 </rss>
