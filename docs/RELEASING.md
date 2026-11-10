@@ -44,7 +44,7 @@ WITH_SPARKLE=1 HEALTHBAR_FEED_URL=https://healthbar.forfutdinov.com/appcast.xml 
 Create the public repo `vladforfutdinov/homebrew-healthbar` and add a write **deploy key** to it; the private key is the secret `TAP_DEPLOY_KEY`. CI renders `packaging/homebrew/healthbar.rb.tmpl` (version + DMG sha256) into `Casks/healthbar.rb` and pushes it. If `TAP_DEPLOY_KEY` is unset the tap bump is skipped. Users install with:
 
 ```sh
-brew install --cask vladforfutdinov/healthbar/healthbar
+brew tap vladforfutdinov/healthbar && brew install --cask healthbar
 ```
 
 ## Repository variables
