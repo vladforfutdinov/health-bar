@@ -34,6 +34,7 @@ Menu → Settings… (⌘,); Escape closes it. Menu → About HealthBar shows th
   - New Service… / the pencil after a service's address: address, name (empty takes the page's own) and group. The address is checked when the field loses focus (a green check means its `status.json` answers) and again on save. Delete… is in the same sheet, with a confirmation.
   - New Group… / the pencil on a group: its name, and Delete…, which offers Delete Group Only (its services move out of the group) or Delete Group and Services.
   - Drag rows to reorder within a group, and groups among themselves. The context menu has Move Up, Move Down, Move to Group, Edit… and Delete…. Expand All / Collapse All folds the groups. The menu and the icon's sectors follow the order of the checked services.
+  - Keyboard: Tab into the list, arrows to move, Space to check a service or fold a group, Return to edit, Delete to delete, ⌥⌘↑/↓ to move.
   - Deleted built-in pages stay deleted. The list is in `Core/Catalog.swift`.
 - **Check status every**: 30 seconds to 15 minutes.
 - **Launch at Login**.

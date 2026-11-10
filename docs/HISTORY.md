@@ -110,3 +110,5 @@ Decisions from a review against Apple's HIG, and what the experiments showed:
 - ⌘Q works in the Settings window (app menu in the hidden main menu); the window reopens where it was closed.
 - Localisation prep: percentages via `FormatStyle.percent`, intervals via `DateComponentsFormatter`, plurals via automatic grammar agreement; UI strings stay English.
 - Differentiate without color: `!`/`~` in the icon's hole, a centre dot on maintenance glyphs; normal appearance unchanged.
+- Confirmations are a small sheet (`ConfirmSheet`) styled like the other sheets: SwiftUI's `.alert` on macOS 26 used large capsule buttons unlike the rest, and Escape didn't dismiss it (the window's Escape handler checks `attachedSheet`, which the alert isn't). Cancel is the default button; Return and Escape cancel.
+- The Settings list has a selection (Tab reaches it; arrows move): Space checks a service or folds a group, Return edits, Delete deletes (confirmed), ⌥⌘↑/↓ move. Hidden buttons with key equivalents, enabled only while the list has focus, since `onKeyPress` needs macOS 14.
