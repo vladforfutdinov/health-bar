@@ -64,7 +64,7 @@ Settings, Secrets and variables, Actions, **Variables** (public values):
 
 ## Appcast hosting
 
-The `gh-pages` branch holds `appcast.xml`; CI creates the branch on the first release and only touches `appcast.xml`. Serve `gh-pages` at `https://healthbar.forfutdinov.com/` (a static host connected to the repo, for example Cloudflare Pages with production branch `gh-pages`, no build command, output `/`; or GitHub Pages with a custom domain). After publishing, CI waits up to 10 minutes for the feed to list the new version and fails the release otherwise. The appcast and the cask follow only the latest release.
+The `gh-pages` branch holds `appcast.xml`; CI creates the branch on the first release and only touches `appcast.xml`. `https://healthbar.forfutdinov.com/` is the Cloudflare Worker in `packaging/feed-worker/`, which proxies the branch from raw.githubusercontent.com (60 s cache); deploy changes with `cd packaging/feed-worker && wrangler deploy`. After publishing, CI waits up to 10 minutes for the feed to list the new version and fails the release otherwise. The appcast and the cask follow only the latest release.
 
 ## Release notes
 

@@ -128,7 +128,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           NOTES="docs/release-notes/${TAG}.md"
-          if [ "${GITHUB_EVENT_NAME}" = push ]; then
+          # a re-run of a tag push finds its release already created
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
             [ -f "$NOTES" ] && NOTES_ARG=(--notes-file "$NOTES") || NOTES_ARG=()
             gh release create "$TAG" dist/HealthBar.dmg dist/HealthBar.zip \
               --title "$TAG" --generate-notes "${NOTES_ARG[@]}"
