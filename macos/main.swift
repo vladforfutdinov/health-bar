@@ -544,7 +544,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let centered = NSMutableParagraphStyle()
         centered.alignment = .center
         credits.addAttribute(.paragraphStyle, value: centered, range: NSRange(location: 0, length: credits.length))
-        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
+        var options: [NSApplication.AboutPanelOptionKey: Any] = [.credits: credits]
+        // The bundle's own icon: the system's copy of a legacy .icns is shrunk into a frame on macOS 26 and reads blurry.
+        if let icon = Bundle.main.url(forResource: "AppIcon", withExtension: "icns").flatMap(NSImage.init(contentsOf:)) {
+            options[.applicationIcon] = icon
+        }
+        NSApp.orderFrontStandardAboutPanel(options: options)
         bringForward(nil)
     }
 
