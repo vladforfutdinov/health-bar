@@ -329,6 +329,9 @@ final class ServiceListView: NSView {
         scrollView.drawsBackground = false
         // Always shown when the list scrolls; it sits in the rows' right padding.
         scrollView.hasVerticalScroller = overflow
+        // No rubber-band bounce when everything fits.
+        scrollView.verticalScrollElasticity = overflow ? .automatic : .none
+        scrollView.horizontalScrollElasticity = .none
         scrollView.scrollerStyle = .legacy
         scrollView.autohidesScrollers = false
         scrollView.documentView = content
