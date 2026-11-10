@@ -3,22 +3,17 @@
     <channel>
         <title>HealthBar</title>
         <item>
-            <title>0.2.0</title>
-            <pubDate>Tue, 10 Nov 2026 15:37:18 +0000</pubDate>
-            <sparkle:version>14</sparkle:version>
-            <sparkle:shortVersionString>0.2.0</sparkle:shortVersionString>
+            <title>0.2.1</title>
+            <pubDate>Tue, 10 Nov 2026 15:43:28 +0000</pubDate>
+            <sparkle:version>15</sparkle:version>
+            <sparkle:shortVersionString>0.2.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description><![CDATA[<h2>What's new</h2>
+            <description><![CDATA[<h2>Fixes</h2>
 <ul>
-<li><strong>Menu bar icon</strong>: a ring with one sector per service, so you can see which service is affected.</li>
-<li><strong>30-day uptime strips</strong>: each service shows one bar per day and the uptime of its least available component. Hover a bar to see that day's affected components, their status and how long it lasted.</li>
-<li><strong>Live menu</strong>: an open menu updates as each service answers. Refresh starts from scratch and keeps the menu open.</li>
-<li><strong>Light theme</strong>: status colours with more contrast on light menus and menu bars.</li>
-<li><strong>Less traffic</strong>: the status is read every minute; incidents and history at launch, on a status change, then hourly (every 15 minutes while a service is not operational).</li>
-<li>New app icon.</li>
+<li>Runs on macOS 13 and later again: earlier builds required the macOS version of the build machine.</li>
 </ul>]]></description>
-            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.2.0/HealthBar.zip" length="1364884" type="application/octet-stream" sparkle:edSignature="g30PbKIYgok4e+MClockxMfpXSvxzzLxT0XjhEIZx7PIuNZ8rJnhJy0JN86tAqX2JbOELnYnsTcS0KBnu5FCBQ=="/>
+            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.2.1/HealthBar.zip" length="1365140" type="application/octet-stream" sparkle:edSignature="FyMk0D2shJI1Tbjja3NS2HwvOAzgr9vspT3sPRgKsZIoAq3DrfKhZyVINJyWyHQrbQ71tj+oP9G2GZ5PQyMUAg=="/>
         </item>
     </channel>
 </rss>
