@@ -92,3 +92,9 @@ Refresh (menu, wake, launch, config reload) clears every service to "updating…
 - The bar icon keeps one sector per service up to 10; beyond that 10 sectors, each problem status getting a share proportional to its count (at least one), worst first (`iconSectors`).
 - Checking a service in Settings saves at once; its data is fetched in the background (checked in the VM: the box flips within 0.15 s).
 - `design/status-icons.svg` has a 5-sector logo variant (`logo5`) in all status colours, for further design.
+
+## 2026-11-10 — concurrency review fixes
+
+- Settings save awaits the page (up to the timeout); Cancel and Delete… in the service sheet were live meanwhile, so a cancelled add still landed, a deleted service came back under its new address, and two adds of one address both passed the duplicate check. Cancel and Delete… are disabled while saving, and `save` re-checks the address and the edited service after the await.
+- `StatusFetcher` uses a session with `timeoutIntervalForResource = 30`: the request timeout counts only idle time, and one trickling page kept `pending > 0`, which skips every timer poll.
+- Reviewed and left: results applied via `RunLoop.main.perform` were suspected of waiting for the next event with the menu closed; not seen in the VM (the icon filled in sector by sector with no input). A Statuspage host answering 200 with HTML on incident.io's `component_impacts` path would be cached as incident.io; not observed.

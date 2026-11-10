@@ -22,7 +22,15 @@ public actor StatusFetcher {
     private let session: URLSession
     private var platforms: [URL: Platform] = [:]
 
-    public init(session: URLSession = .shared) {
+    /// Caps a whole response at 30 s: the per-request timeout only counts idle time, so a page trickling bytes could
+    /// hold a poll (and, through `pending`, every timer poll after it) indefinitely.
+    public static let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForResource = 30
+        return URLSession(configuration: config)
+    }()
+
+    public init(session: URLSession = StatusFetcher.session) {
         self.session = session
     }
 

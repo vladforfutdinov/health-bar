@@ -71,6 +71,9 @@ final class SettingsModel: ObservableObject {
                 return "\(url.host ?? ""): \(error.localizedDescription)"
             }
         }
+        // The config may have changed while the page was being read.
+        if url != draft.original, config.contains(url) { return "\(url.host ?? "") is already in the list." }
+        if let original = draft.original, !config.contains(original) { return "This service was deleted meanwhile." }
         let typed = draft.name.trimmingCharacters(in: .whitespaces)
         let name = typed.isEmpty ? (pageName ?? url.host ?? url.absoluteString) : typed
         var c = config
@@ -424,6 +427,7 @@ private struct ServiceSheet: View {
             HStack {
                 if let original = draft.original {
                     Button("Delete…", role: .destructive) { confirmingDelete = true }
+                        .disabled(saving)
                         .alert("Delete \(draft.name.isEmpty ? original.host ?? "" : draft.name)?", isPresented: $confirmingDelete) {
                             Button("Delete", role: .destructive) {
                                 delete(original)
@@ -435,6 +439,8 @@ private struct ServiceSheet: View {
                 if saving { ProgressView().controlSize(.small) }
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
+                    // A save in flight still writes when it returns; closing now would let it add what was cancelled.
+                    .disabled(saving)
                     .keyboardShortcut(.cancelAction)
                 Button(isNew ? "Add" : "Save", action: commit)
                     .keyboardShortcut(.defaultAction)
