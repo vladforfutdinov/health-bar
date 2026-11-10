@@ -180,6 +180,7 @@ final class RowView: NSView, NSViewToolTipOwner {
     private let top: CGFloat
     private let closesMenu: Bool
     private let note: String?
+    private let stripText: String?
     private var tips: [NSView.ToolTipTag: String] = [:]
     private static let noteFont = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
 
@@ -198,10 +199,12 @@ final class RowView: NSView, NSViewToolTipOwner {
     ///   - closesMenu: `false` keeps the menu open after the click.
     ///   - note: a third line under the strip (an incident or the fetch error), truncated to the row.
     ///   - label: what VoiceOver reads; defaults to the title's text.
+    ///   - stripText: drawn in the strip's place instead of its bars, e.g. when the page publishes no history.
     init(title: @escaping (Bool) -> NSAttributedString, days: [Level?]?, percent: String? = nil, lead: CGFloat = 0,
          dayTips: [String] = [], tip: String? = nil, rightEdge: CGFloat, width: CGFloat, closesMenu: Bool = true,
-         note: String? = nil, label: String? = nil) {
+         note: String? = nil, label: String? = nil, stripText: String? = nil) {
         self.title = title
+        self.stripText = stripText
         self.percent = percent
         self.note = note
         self.rightEdge = rightEdge
@@ -264,8 +267,13 @@ final class RowView: NSView, NSViewToolTipOwner {
         line.draw(at: NSPoint(x: Self.textX, y: top))
         guard let strip else { return }
         let y = top + ceil(line.size().height) + Self.gap
-        strip.draw(in: NSRect(origin: NSPoint(x: stripX, y: y), size: strip.size), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
         let secondary = highlighted ? NSColor.selectedMenuItemTextColor : NSColor.secondaryLabelColor
+        if let stripText {
+            let text = NSAttributedString(string: stripText, attributes: [.font: Self.noteFont, .foregroundColor: secondary])
+            text.draw(at: NSPoint(x: stripX, y: y + (strip.size.height - text.size().height) / 2))
+        } else {
+            strip.draw(in: NSRect(origin: NSPoint(x: stripX, y: y), size: strip.size), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        }
         if let note {
             let style = NSMutableParagraphStyle()
             style.lineBreakMode = .byTruncatingTail
@@ -335,6 +343,8 @@ final class ServiceListView: NSView {
         scrollView.scrollerStyle = .legacy
         scrollView.autohidesScrollers = false
         scrollView.documentView = content
+        // The scroller takes width from the visible area; content as wide as before would scroll sideways.
+        content.setFrameSize(NSSize(width: scrollView.contentSize.width, height: content.frame.height))
         content.autoresizingMask = [.width]
         addSubview(scrollView)
         scrollView.contentView.postsBoundsChangedNotifications = true
@@ -545,7 +555,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 lead: 12 + NSAttributedString(string: "  ", attributes: [.font: NSFont.menuFont(ofSize: 0)]).size().width,
                 dayTips: row.uptime?.days.map(dayTip) ?? [], tip: tip,
                 rightEdge: RowView.textX + right, width: right + 2 * RowView.textX,
-                note: Self.note(row.state), label: Self.spoken(row.service, row.state))
+                note: Self.note(row.state), label: Self.spoken(row.service, row.state),
+                // Read, but the page publishes no per-day history (uptime display off, or the feed refused).
+                stripText: row.state.details != nil && row.uptime == nil ? "No uptime history" : nil)
             let url = row.item.representedObject as? URL
             view.onClick = { if let url { NSWorkspace.shared.open(url) } }
             serviceRows.append(view)
