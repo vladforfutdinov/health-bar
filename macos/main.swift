@@ -181,6 +181,8 @@ final class RowView: NSView, NSViewToolTipOwner {
     private let closesMenu: Bool
     private let note: String?
     private let stripText: String?
+    /// Height that shows the title and the top edge of the strip: how much of a cut-off row a list shows.
+    let peekHeight: CGFloat
     private var tips: [NSView.ToolTipTag: String] = [:]
     private static let noteFont = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
 
@@ -219,6 +221,7 @@ final class RowView: NSView, NSViewToolTipOwner {
         top = strip == nil ? 3 : 4
         let noteHeight = note == nil ? 0 : 2 + ceil(Self.noteFont.ascender - Self.noteFont.descender + Self.noteFont.leading)
         let height = top + line + (strip.map { Self.gap + $0.size.height + noteHeight + 5 } ?? 3)
+        peekHeight = top + line + Self.gap + (strip.map { $0.size.height * 0.4 } ?? 0)
         super.init(frame: NSRect(x: 0, y: 0, width: width, height: height))
         autoresizingMask = [.width]
         setAccessibilityElement(true)
@@ -268,11 +271,11 @@ final class RowView: NSView, NSViewToolTipOwner {
         guard let strip else { return }
         let y = top + ceil(line.size().height) + Self.gap
         let secondary = highlighted ? NSColor.selectedMenuItemTextColor : NSColor.secondaryLabelColor
+        strip.draw(in: NSRect(origin: NSPoint(x: stripX, y: y), size: strip.size), from: .zero, operation: .sourceOver,
+                   fraction: stripText == nil ? 1 : 0.25, respectFlipped: true, hints: nil)
         if let stripText {
             let text = NSAttributedString(string: stripText, attributes: [.font: Self.noteFont, .foregroundColor: secondary])
-            text.draw(at: NSPoint(x: stripX, y: y + (strip.size.height - text.size().height) / 2))
-        } else {
-            strip.draw(in: NSRect(origin: NSPoint(x: stripX, y: y), size: strip.size), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            text.draw(at: NSPoint(x: stripX + 6, y: y + (strip.size.height - text.size().height) / 2))
         }
         if let note {
             let style = NSMutableParagraphStyle()
@@ -326,22 +329,22 @@ final class ServiceListView: NSView {
             content.addSubview(row)
             y += row.frame.height
         }
-        // Half of the next row peeks out, so the list reads as scrollable.
+        // The next row's title and the edge of its strip peek out, so the list reads as scrollable.
         let overflow = rows.count > visibleRows
-        let visible = rows.prefix(visibleRows).reduce(0) { $0 + $1.frame.height } + (overflow ? rows[visibleRows].frame.height / 2 : 0)
+        let visible = rows.prefix(visibleRows).reduce(0) { $0 + $1.frame.height } + (overflow ? rows[visibleRows].peekHeight : 0)
         self.rows = rows
         super.init(frame: NSRect(x: 0, y: 0, width: width, height: visible))
         autoresizingMask = [.width]
         scrollView.frame = bounds
         scrollView.autoresizingMask = [.width, .height]
         scrollView.drawsBackground = false
-        // Always shown when the list scrolls; it sits in the rows' right padding.
+        // The standard overlay scroller: appears while scrolling, over the rows' right padding.
         scrollView.hasVerticalScroller = overflow
         // No rubber-band bounce when everything fits.
         scrollView.verticalScrollElasticity = overflow ? .automatic : .none
         scrollView.horizontalScrollElasticity = .none
-        scrollView.scrollerStyle = .legacy
-        scrollView.autohidesScrollers = false
+        scrollView.scrollerStyle = .overlay
+        scrollView.autohidesScrollers = true
         scrollView.documentView = content
         // The scroller takes width from the visible area; content as wide as before would scroll sideways.
         content.setFrameSize(NSSize(width: scrollView.contentSize.width, height: content.frame.height))
