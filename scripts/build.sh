@@ -107,7 +107,7 @@ if [ "${WITH_SPARKLE:-0}" = "1" ]; then
                  -Xlinker -rpath -Xlinker @executable_path/../Frameworks)
 fi
 
-swiftc "${SWIFT_FLAGS[@]}" -o "$APP/Contents/MacOS/$EXEC" macos/main.swift Core/*.swift "${LINK_FLAGS[@]}"
+swiftc "${SWIFT_FLAGS[@]}" -o "$APP/Contents/MacOS/$EXEC" macos/*.swift Core/*.swift "${LINK_FLAGS[@]}"
 
 # Signing: SIGN_IDENTITY (Developer ID + Hardened Runtime + timestamp, required for notarization),
 # else ad-hoc. Hardened Runtime is Developer-ID-only: its library validation rejects an embedded

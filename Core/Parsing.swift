@@ -2,7 +2,7 @@ import Foundation
 
 /// Statuspage `/api/v2/status.json` and `/api/v2/summary.json`; incident.io serves compatible copies.
 struct StatuspageSummary: Decodable {
-    struct Page: Decodable { let url: URL }
+    struct Page: Decodable { let name: String?; let url: URL }
     struct Status: Decodable { let indicator: String; let description: String }
     struct Component: Decodable { let id: String; let name: String; let group: Bool?; let groupId: String? }
     struct Update: Decodable { let body: String? }

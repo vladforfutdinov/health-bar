@@ -1,5 +1,5 @@
 import AppKit
-import ServiceManagement
+import SwiftUI
 #if SPARKLE
 import Sparkle
 #endif
@@ -248,7 +248,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let menu = NSMenu()
     private let fetcher = StatusFetcher()
     private var config = Config.default
-    private var configError: String?
     private var states: [ServiceState] = []
     private var updatedAt: Date?
     /// Services whose result for the current poll has not arrived yet.
@@ -258,6 +257,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Right edge of the last rendered menu; kept while services load so their shorter "updating…" titles don't pull it in.
     private var titleEdge: CGFloat = 0
     private var timer: Timer?
+    private var settingsWindow: NSWindow?
     #if SPARKLE
     private var updater: SPUStandardUpdaterController?
     #endif
@@ -271,29 +271,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.autosaveName = Bundle.main.bundleIdentifier ?? "HealthBar"
         menu.autoenablesItems = false
         menu.showsStateColumn = false
+        menu.delegate = self
         statusItem.menu = menu
         setIcon([], label: "loading")
-        loadConfig()
+        config = Config.load()
+        startTimer()
+        refresh()
         NSWorkspace.shared.notificationCenter.addObserver(
-            self, selector: #selector(refresh), name: NSWorkspace.didWakeNotification, object: nil)    }
+            self, selector: #selector(refresh), name: NSWorkspace.didWakeNotification, object: nil)
+    }
 
-    private func loadConfig() {
-        do {
-            config = try Config.loadOrCreate()
-            configError = nil
-        } catch {
-            configError = error.localizedDescription
-        }
+    private func startTimer() {
         timer?.invalidate()
         let t = Timer(timeInterval: TimeInterval(config.refreshSeconds), repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.poll(force: false) }
         }
         RunLoop.main.add(t, forMode: .common)
         timer = t
-        refresh()
     }
 
-    /// Launch, wake, config reload and the Refresh item drop what is shown and read everything again, details included.
+    /// From the Settings window. Services keep their data across a reorder; added ones are read at once.
+    private func configChanged(_ new: Config) {
+        let old = config
+        config = new
+        if new.refreshSeconds != old.refreshSeconds { startTimer() }
+        guard new.services.map(\.url) != old.services.map(\.url) else { return render() }
+        let known = Dictionary(zip(old.services.map(\.url), states), uniquingKeysWith: { a, _ in a })
+        states = new.services.map { known[$0.url] ?? ServiceState() }
+        // Results in flight are indexed by the old list.
+        generation += 1
+        pending = 0
+        poll(force: false)
+    }
+
+    /// Launch, wake and the Refresh item drop what is shown and read everything again, details included.
     @objc private func refresh() {
         states = config.services.map { _ in ServiceState() }
         updatedAt = nil
@@ -380,7 +391,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let updated = updatedAt.map { "Updated \(DateFormatter.localizedString(from: $0, dateStyle: .none, timeStyle: .short))" }
         menu.addItem(disabled(updated ?? "Updating…"))
-        if let configError { menu.addItem(disabled("Config error: \(configError)")) }
         let refresh = withShortcut(action("Refresh", #selector(refresh)), "r", rightEdge: right)
         let refreshTitle = refresh.attributedTitle ?? NSAttributedString()
         // Stays open so the services can be watched refilling.
@@ -388,15 +398,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                rightEdge: RowView.textX + right, width: RowView.textX + right + 14, closesMenu: false)
         menu.addItem(refresh)
         menu.addItem(.separator())
-        menu.addItem(action("Edit Config…", #selector(editConfig)))
-        menu.addItem(action("Reload Config", #selector(reloadConfig)))
-        // A checked item makes the state column indent every row, strips included; the check goes in the title.
-        let enabled = SMAppService.mainApp.status == .enabled
-        let login = action(enabled ? "✓ Launch at Login" : "Launch at Login", #selector(toggleLaunchAtLogin))
-        menu.addItem(login)
-        #if SPARKLE
-        menu.addItem(action("Check for Updates…", #selector(checkForUpdates)))
-        #endif
+        // Views: macOS 26 gives items titled "About …" and "Settings…" stock icons, which indent the rows.
+        let about = action("About HealthBar", #selector(openAbout))
+        let aboutTitle = NSAttributedString(string: about.title, attributes: [.font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.labelColor])
+        about.view = RowView(title: { $0 ? Self.whitened(aboutTitle) : aboutTitle }, days: nil,
+                             rightEdge: RowView.textX + right, width: RowView.textX + right + 14)
+        menu.addItem(about)
+        let settings = withShortcut(action("Settings…", #selector(openSettings)), ",", rightEdge: right)
+        let settingsTitle = settings.attributedTitle ?? NSAttributedString()
+        settings.view = RowView(title: { $0 ? Self.whitened(settingsTitle) : settingsTitle }, days: nil,
+                                rightEdge: RowView.textX + right, width: RowView.textX + right + 14)
+        menu.addItem(settings)
         menu.addItem(.separator())
         menu.addItem(withShortcut(action("Quit HealthBar", #selector(quit)), "q", rightEdge: right))
     }
@@ -424,14 +436,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return item
     }
 
-    /// Shows `⌘<key>` as text and adds a hidden twin that owns the key equivalent:
-    /// a visible key equivalent makes macOS reserve a shortcut column on every row.
+    /// Shows `⌘<key>` as text; `menuHasKeyEquivalent` handles the key. A real key equivalent, even on a hidden
+    /// twin item, makes macOS reserve a shortcut column on every row.
     private func withShortcut(_ item: NSMenuItem, _ key: String, rightEdge: CGFloat) -> NSMenuItem {
-        let twin = NSMenuItem(title: item.title, action: item.action, keyEquivalent: key)
-        twin.target = item.target
-        twin.isHidden = true
-        twin.allowsKeyEquivalentWhenHidden = true
-        menu.addItem(twin)
         let hint = NSAttributedString(string: "⌘" + key.uppercased(), attributes: [
             .font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.tertiaryLabelColor,
         ])
@@ -525,34 +532,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Not `NSApplication.terminate(_:)` directly: macOS 26 gives items with that action a stock icon, which indents the row.
     @objc private func quit() { NSApp.terminate(nil) }
 
-    @objc private func editConfig() {
-        _ = try? Config.loadOrCreate()
-        NSWorkspace.shared.open(Config.fileURL)
+    /// The standard About panel: icon, name and version from the bundle, copyright from `NSHumanReadableCopyright`.
+    @objc private func openAbout() {
+        let credits = NSMutableAttributedString(string: "Status of the services you depend on, in the menu bar.\n\n", attributes: [
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize), .foregroundColor: NSColor.secondaryLabelColor,
+        ])
+        let slug = (Bundle.main.object(forInfoDictionaryKey: "HBRepoSlug") as? String).flatMap { $0.isEmpty ? nil : $0 } ?? "vladforfutdinov/health-bar"
+        credits.append(NSAttributedString(string: "github.com/\(slug)", attributes: [
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize), .link: URL(string: "https://github.com/\(slug)")!,
+        ]))
+        credits.append(NSAttributedString(string: "\nMIT License", attributes: [
+            .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize), .foregroundColor: NSColor.secondaryLabelColor,
+        ]))
+        let centered = NSMutableParagraphStyle()
+        centered.alignment = .center
+        credits.addAttribute(.paragraphStyle, value: centered, range: NSRange(location: 0, length: credits.length))
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
+        bringForward(nil)
     }
 
-    @objc private func reloadConfig() {
-        loadConfig()
-    }
-
-    @objc private func toggleLaunchAtLogin() {
-        do {
-            if SMAppService.mainApp.status == .enabled {
-                try SMAppService.mainApp.unregister()
-            } else {
-                try SMAppService.mainApp.register()
-            }
-        } catch {
-            NSApp.activate(ignoringOtherApps: true)
-            NSAlert(error: error).runModal()
+    @objc private func openSettings() {
+        if settingsWindow == nil {
+            let onChange: (Config) -> Void = { [weak self] in self?.configChanged($0) }
+            #if SPARKLE
+            let model = SettingsModel(config: config, fetcher: fetcher, updater: updater?.updater, onChange: onChange)
+            #else
+            let model = SettingsModel(config: config, fetcher: fetcher, onChange: onChange)
+            #endif
+            let window = SettingsWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: false)
+            window.contentViewController = NSHostingController(rootView: SettingsView(model: model))
+            window.title = "HealthBar Settings"
+            window.isReleasedWhenClosed = false
+            window.center()
+            settingsWindow = window
         }
-        render()
+        bringForward(settingsWindow)
     }
 
-    #if SPARKLE
-    @objc private func checkForUpdates() {
-        updater?.checkForUpdates(nil)
+    /// Activates the app and fronts `window` once the status menu has finished closing. Activating while it closes,
+    /// or with the cooperative `NSApp.activate()`, left keyboard focus with the previous app.
+    private func bringForward(_ window: NSWindow?) {
+        RunLoop.main.perform(inModes: [.common]) {
+            NSApp.activate(ignoringOtherApps: true)
+            window?.makeKeyAndOrderFront(nil)
+        }
     }
-    #endif
+}
+
+extension AppDelegate: NSMenuDelegate {
+    /// ⌘R, ⌘, and ⌘Q while the menu is open, without items carrying key equivalents (see `withShortcut`).
+    nonisolated func menuHasKeyEquivalent(_ menu: NSMenu, for event: NSEvent, target: AutoreleasingUnsafeMutablePointer<AnyObject?>,
+                                          action: UnsafeMutablePointer<Selector?>) -> Bool {
+        guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command else { return false }
+        let selector: Selector
+        switch event.charactersIgnoringModifiers {
+        case "r": selector = #selector(refresh)
+        case ",": selector = #selector(openSettings)
+        case "q": selector = #selector(quit)
+        default: return false
+        }
+        target.pointee = self
+        action.pointee = selector
+        return true
+    }
 }
 
 #if SPARKLE
@@ -565,6 +607,18 @@ extension AppDelegate: SPUUpdaterDelegate {
 }
 #endif
 
+/// Closes on Escape unless a sheet is open (the sheet's Cancel takes it); caught in `sendEvent` because the
+/// services list consumes Escape before `cancelOperation` reaches the window.
+final class SettingsWindow: NSWindow {
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .keyDown, event.keyCode == 53, attachedSheet == nil {
+            performClose(nil)
+            return
+        }
+        super.sendEvent(event)
+    }
+}
+
 @main
 enum HealthBarApp {
     @MainActor static func main() {
@@ -572,6 +626,7 @@ enum HealthBarApp {
         let delegate = AppDelegate()
         app.delegate = delegate
         app.setActivationPolicy(.accessory)
+        app.mainMenu = editingMainMenu()
         app.run()
     }
 }

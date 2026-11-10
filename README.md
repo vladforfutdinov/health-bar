@@ -24,18 +24,20 @@ The menu bar icon is a ring (donut) split into one sector per service, clockwise
 
 In the menu each service carries its own glyph (`design/status-icons.svg`).
 
-## Config
+## Settings
 
-`~/Library/Application Support/HealthBar/services.json`, created on first launch (menu → Edit Config…, then Reload Config):
+Menu → Settings… (⌘,); Escape closes it. Menu → About HealthBar shows the version.
 
-```json
-{
-  "refreshSeconds": 60,
-  "services": [{ "name": "GitHub", "url": "https://www.githubstatus.com" }]
-}
-```
+- **Services**: a built-in list of about 60 developer-service status pages in groups (Git, CI; AI; Hosting, cloud; Databases; Packages; Monitoring; Auth, secrets, network; Email, messaging, media; Work tools); GitHub, OpenAI, Claude, Vercel and Supabase are checked by default. Check the ones to show. Services can also sit outside any group, at the top.
+  - New Service… / the pencil after a service's address: address, name (empty takes the page's own) and group. The address is checked when the field loses focus (a green check means its `status.json` answers) and again on save. Delete… is in the same sheet, with a confirmation.
+  - New Group… / the pencil on a group: its name, and Delete…, which asks whether to keep the group's services (they move out of the group) or delete them too.
+  - Drag services and groups by the dotted grip at the row's end; services can move between groups. Groups fold (Fold all / Unfold all). The menu and the icon's sectors follow the order of the checked services.
+  - Deleted built-in pages stay deleted. The list is in `Core/Catalog.swift`.
+- **Check status every**: 30 seconds to 15 minutes.
+- **Launch at Login**.
+- **Updates**: automatic checks and installs, Check Now.
 
-Any Atlassian Statuspage or incident.io status page works; the platform is detected automatically.
+Any Atlassian Statuspage or incident.io status page works; the platform is detected automatically. Changes apply at once. Settings live in the app's user defaults; a `~/Library/Application Support/HealthBar/services.json` from 0.2.x is imported once on first launch (its services checked, the rest of the list unchecked) and then ignored. Pages added to the built-in list in later versions appear unchecked.
 
 ## Menu
 

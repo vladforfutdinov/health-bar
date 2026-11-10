@@ -45,6 +45,12 @@ public actor StatusFetcher {
         try decodeStatuspage(await get(base.appendingPathComponent("api/v2/status.json"))).pageStatus
     }
 
+    /// Checks that `base` serves a status page and returns the page's own name, if it has one.
+    /// - Throws: network errors, `FetchError.http`, or `DecodingError` when it is not a status page.
+    public func pageName(_ base: URL) async throws -> String? {
+        try decodeStatuspage(await get(base.appendingPathComponent("api/v2/status.json"))).page.name
+    }
+
     /// Incidents from `summary.json` plus the uptime strip; a failed strip leaves `uptime` nil.
     public func details(_ base: URL, now: Date = Date()) async throws -> ServiceDetails {
         let summary = try decodeStatuspage(await get(base.appendingPathComponent("api/v2/summary.json")))
@@ -75,6 +81,13 @@ public actor StatusFetcher {
             batches.append(try decodeShowcase(data))
         }
         return showcaseUptime(batches, days: Self.historyDays, names: summary.componentNames)
+    }
+
+    /// Whether `base` looks like a status page: a HEAD of its `status.json` answers 200. Cheap enough to run while typing.
+    public func answers(_ base: URL) async -> Bool {
+        var req = URLRequest(url: base.appendingPathComponent("api/v2/status.json"), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+        req.httpMethod = "HEAD"
+        return ((try? await session.data(for: req))?.1 as? HTTPURLResponse)?.statusCode == 200
     }
 
     private func get(_ url: URL, query: [String: String] = [:]) async throws -> Data {

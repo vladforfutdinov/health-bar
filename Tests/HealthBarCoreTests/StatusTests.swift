@@ -42,6 +42,7 @@ final class StatusTests: XCTestCase {
     func testStatusJSON() throws {
         let json = #"{"page":{"id":"x","name":"GitHub","url":"https://www.githubstatus.com"},"status":{"indicator":"major","description":"Partial System Outage"}}"#
         XCTAssertEqual(try decodeStatuspage(Data(json.utf8)).pageStatus, PageStatus(level: .outage, description: "Partial System Outage"))
+        XCTAssertEqual(try decodeStatuspage(Data(json.utf8)).page.name, "GitHub")
     }
 
     func testRealStatuspageSummaries() throws {
@@ -167,18 +168,180 @@ final class StatusTests: XCTestCase {
         XCTAssertTrue(due(.degraded, .degraded, after: 15))
     }
 
-    func testConfigCreatesDefaultAndClampsInterval() throws {
+    private func scratchDefaults() -> UserDefaults {
+        let name = "HealthBarTests-\(UUID().uuidString)"
+        addTeardownBlock { UserDefaults.standard.removePersistentDomain(forName: name) }
+        return UserDefaults(suiteName: name)!
+    }
+
+    private func scratchFile(_ contents: String?) throws -> URL {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? FileManager.default.removeItem(at: dir) }
+        addTeardownBlock { try? FileManager.default.removeItem(at: dir) }
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let file = dir.appendingPathComponent("services.json")
+        if let contents { try Data(contents.utf8).write(to: file) }
+        return file
+    }
 
-        XCTAssertEqual(try Config.loadOrCreate(at: file), .default)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
+    func testConfigDefaultsWhenNothingStoredOrImported() throws {
+        let defaults = scratchDefaults()
+        XCTAssertEqual(Config.load(from: defaults, legacyFile: try scratchFile(nil)), .default)
+        XCTAssertNotNil(defaults.data(forKey: Config.defaultsKey), "stored on first load")
+    }
 
-        try Data(#"{"refreshSeconds":1,"services":[]}"#.utf8).write(to: file)
-        XCTAssertEqual(try Config.loadOrCreate(at: file).refreshSeconds, Config.minRefreshSeconds)
+    func testDefaultShowsTheOriginalFive() {
+        XCTAssertEqual(Config.default.services.map(\.name), ["GitHub", "OpenAI", "Claude", "Vercel", "Supabase"])
+        let urls = Config.catalog.flatMap(\.services).map(\.url)
+        XCTAssertEqual(Set(urls).count, urls.count, "no page listed twice")
+    }
 
-        try Data("{".utf8).write(to: file)
-        XCTAssertThrowsError(try Config.loadOrCreate(at: file))
+    func testConfigImportsLegacyFileOnce() throws {
+        let defaults = scratchDefaults()
+        let file = try scratchFile(#"{"refreshSeconds":50,"services":[{"name":"Mine","url":"https://status.npmjs.org"},{"name":"X","url":"https://x.example"}]}"#)
+        let imported = Config.load(from: defaults, legacyFile: file)
+        XCTAssertEqual(imported.refreshSeconds, 60)
+        XCTAssertEqual(imported.services.map(\.name), ["X", "npm"], "exactly the legacy pages; catalog names win")
+        XCTAssertEqual(imported.ungrouped.map(\.name), ["X"], "pages outside the catalog go outside the groups")
+
+        try Data(#"{"refreshSeconds":900,"services":[]}"#.utf8).write(to: file)
+        XCTAssertEqual(Config.load(from: defaults, legacyFile: file), imported, "the file is not read again")
+    }
+
+    func testConfigMalformedLegacyFileFallsBackToDefault() throws {
+        XCTAssertEqual(Config.load(from: scratchDefaults(), legacyFile: try scratchFile("{")), .default)
+    }
+
+    func testConfigSaveRoundTrip() throws {
+        let defaults = scratchDefaults()
+        var config = Config.default
+        config.refreshSeconds = 300
+        config.groups.swapAt(0, 1)
+        config.groups[0].services[0].enabled = false
+        let mine = config.addGroup(named: "Mine")
+        config.add(ServiceConfig(name: "Y", url: URL(string: "https://y.example")!), toGroup: mine)
+        config.save(to: defaults)
+        XCTAssertEqual(Config.load(from: defaults, legacyFile: try scratchFile(nil)), config)
+    }
+
+    func testStoredConfigGainsNewCatalogPagesDisabled() {
+        let new = ServiceConfig(name: "New", url: URL(string: "https://new.example")!, enabled: true)
+        let catalog = Config.catalog + [ServiceGroup(name: "Fresh", services: [new])]
+        var trimmed = Config.default
+        trimmed.groups[0].services.removeLast()
+        let merged = trimmed.addingMissing(from: catalog)
+        XCTAssertEqual(merged.groups.last, ServiceGroup(name: "Fresh", services: [ServiceConfig(name: "New", url: new.url, enabled: false)]))
+        var renamed = Config.default
+        renamed.groups[0].name = "Renamed"
+        XCTAssertEqual(renamed.addingMissing(from: Config.catalog).groups.count, Config.catalog.count, "matched by id, not name")
+        XCTAssertEqual(merged.groups[0].services.last?.url, Config.catalog[0].services.last?.url, "re-added to its group")
+        XCTAssertEqual(merged.services, Config.default.services, "nothing new is shown")
+    }
+
+    func testUserGroups() throws {
+        var config = Config.default
+        let id = config.addGroup(named: "Mine")
+        let page = ServiceConfig(name: "Z", url: URL(string: "https://z.example")!)
+        config.add(page, toGroup: id)
+        XCTAssertEqual(config.groups.last?.services, [page])
+        XCTAssertEqual(config.groups.last?.isCustom, true)
+        XCTAssertEqual(config.groups.first?.isCustom, false)
+        XCTAssertTrue(Config.isCustom(page.url))
+        XCTAssertFalse(Config.isCustom(URL(string: "https://www.githubstatus.com")!))
+        XCTAssertEqual(config.services.last, page)
+
+        let old = try JSONDecoder().decode(ServiceGroup.self, from: Data(#"{"name":"AI","services":[]}"#.utf8))
+        XCTAssertEqual(old.id, "AI", "stored before ids: the name")
+    }
+
+    func testMovingServicesAndGroups() {
+        func names(_ c: Config, _ g: Int) -> [String] { c.groups[g].services.map(\.name) }
+        let url = { (name: String) in Config.catalog.flatMap(\.services).first { $0.name == name }!.url }
+        var c = Config.default
+
+        c.move(url("GitHub"), to: url("CircleCI"), after: true)
+        XCTAssertEqual(Array(names(c, 0).prefix(3)), ["Bitbucket", "CircleCI", "GitHub"])
+        c.move(url("GitHub"), to: url("Bitbucket"), after: false)
+        XCTAssertEqual(Array(names(c, 0).prefix(3)), ["GitHub", "Bitbucket", "CircleCI"])
+        c.move(url("GitHub"), to: url("GitHub"), after: true)
+        XCTAssertEqual(names(c, 0).first, "GitHub", "onto itself: no change")
+
+        c.move(url("Claude"), to: url("GitHub"), after: true)
+        XCTAssertEqual(Array(names(c, 0).prefix(3)), ["GitHub", "Claude", "Bitbucket"], "across groups")
+        XCTAssertFalse(names(c, 1).contains("Claude"))
+
+        c.move(url("Claude"), intoGroup: "Databases")
+        XCTAssertEqual(c.groups[3].services.first?.name, "Claude", "dropped on a header: top of that group")
+        XCTAssertEqual(c.services.map(\.name), ["GitHub", "OpenAI", "Vercel", "Claude", "Supabase"])
+
+        c.moveGroup("Databases", to: "Git, CI", after: false)
+        XCTAssertEqual(c.groups.prefix(3).map(\.name), ["Databases", "Git, CI", "AI"])
+        c.moveGroup("Databases", to: "AI", after: true)
+        XCTAssertEqual(c.groups.prefix(3).map(\.name), ["Git, CI", "AI", "Databases"])
+        c.moveGroup("Git, CI", to: c.groups.last!.id, after: true)
+        XCTAssertEqual(c.groups.last?.name, "Git, CI", "after the last group")
+        XCTAssertEqual(c.addingMissing(from: Config.catalog), c, "moved catalog pages are not re-added")
+    }
+
+    func testReplacingAService() {
+        var c = Config.default
+        let gh = c.groups[0].services[0]
+        var renamed = gh
+        renamed.name = "GH"
+        c.replace(gh.url, with: renamed, inGroup: "Git, CI")
+        XCTAssertEqual(c.groups[0].services[0], renamed, "same group: in place")
+
+        let mine = c.addGroup(named: "Mine")
+        c.replace(gh.url, with: renamed, inGroup: mine)
+        XCTAssertEqual(c.groups.last?.services, [renamed], "other group: moved to its end")
+        XCTAssertEqual(c.group(of: gh.url), mine)
+        XCTAssertFalse(c.groups[0].services.contains(renamed))
+    }
+
+    func testUngroupedServices() throws {
+        let url = { (name: String) in Config.catalog.flatMap(\.services).first { $0.name == name }!.url }
+        var c = Config.default
+        let solo = ServiceConfig(name: "Solo", url: URL(string: "https://solo.example")!)
+        c.add(solo, toGroup: Config.noGroup)
+        XCTAssertEqual(c.services.first, solo, "ungrouped come first")
+        XCTAssertEqual(c.group(of: solo.url), Config.noGroup)
+
+        c.move(url("GitHub"), to: solo.url, after: true)
+        XCTAssertEqual(c.ungrouped.map(\.name), ["Solo", "GitHub"], "dragged out of a group")
+        c.move(solo.url, intoGroup: "AI")
+        XCTAssertEqual(c.groups[1].services.first, solo)
+
+        let mine = c.addGroup(named: "Mine")
+        c.move(solo.url, intoGroup: mine)
+        c.removeGroup(mine, keepingServices: true)
+        XCTAssertEqual(c.ungrouped.last, solo, "kept: moved outside the groups")
+        let other = c.addGroup(named: "Other")
+        c.move(solo.url, intoGroup: other)
+        c.removeGroup(other, keepingServices: false)
+        XCTAssertFalse(c.contains(solo.url))
+
+        c.remove(url("GitHub"))
+        XCTAssertFalse(c.contains(url("GitHub")))
+        XCTAssertFalse(c.addingMissing(from: Config.catalog).contains(url("GitHub")), "a deleted catalog page stays deleted")
+        c.removeGroup("AI", keepingServices: false)
+        XCTAssertFalse(c.addingMissing(from: Config.catalog).groups.contains { $0.id == "AI" }, "nor does a deleted catalog group")
+
+        let stored = try JSONDecoder().decode(Config.self, from: Data(#"{"refreshSeconds":60,"groups":[]}"#.utf8))
+        XCTAssertEqual(stored.ungrouped, [], "stored before ungrouped existed")
+    }
+
+    func testPageURLFromTypedText() {
+        XCTAssertEqual(ServiceConfig.pageURL(from: " status.example.com/ ")?.absoluteString, "https://status.example.com")
+        XCTAssertEqual(ServiceConfig.pageURL(from: "http://x.example//")?.absoluteString, "http://x.example")
+        XCTAssertEqual(ServiceConfig.pageURL(from: "https://example.com/status")?.absoluteString, "https://example.com/status")
+        XCTAssertNil(ServiceConfig.pageURL(from: ""))
+        XCTAssertNil(ServiceConfig.pageURL(from: "ftp://x.example"))
+        XCTAssertNil(ServiceConfig.pageURL(from: "not a url"))
+    }
+
+    func testRefreshIntervalSnapsToChoices() {
+        XCTAssertEqual(Config.snapped(1), 30)
+        XCTAssertEqual(Config.snapped(60), 60)
+        XCTAssertEqual(Config.snapped(90), 120, "tie goes to the longer interval")
+        XCTAssertEqual(Config.snapped(100_000), 900)
     }
 }
