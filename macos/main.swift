@@ -214,8 +214,15 @@ final class RowView: NSView, NSViewToolTipOwner {
         tips[tag] ?? ""
     }
 
+    /// Set for a row inside `ServiceListView`: clicking runs it, and `hovered` (set by the list) drives the
+    /// highlight, since the enclosing menu item is the whole list.
+    var onClick: (() -> Void)?
+    var hovered = false {
+        didSet { if hovered != oldValue { needsDisplay = true } }
+    }
+
     override func draw(_ dirtyRect: NSRect) {
-        let highlighted = enclosingMenuItem?.isHighlighted == true
+        let highlighted = onClick == nil ? enclosingMenuItem?.isHighlighted == true : hovered
         if highlighted {
             NSColor.selectedContentBackgroundColor.setFill()
             NSBezierPath(roundedRect: bounds.insetBy(dx: 5, dy: 0), xRadius: 8, yRadius: 8).fill()
@@ -234,11 +241,76 @@ final class RowView: NSView, NSViewToolTipOwner {
     }
 
     override func mouseUp(with event: NSEvent) {
+        if let onClick {
+            enclosingMenuItem?.menu?.cancelTracking()
+            RunLoop.main.perform(inModes: [.common], block: onClick)
+            return
+        }
         guard let item = enclosingMenuItem, let action = item.action else { return }
         if closesMenu { item.menu?.cancelTracking() }
         // After this event: the action may refill the menu, removing this view.
         RunLoop.main.perform(inModes: [.common]) { NSApp.sendAction(action, to: item.target, from: item) }
     }
+}
+
+/// The services in the menu: `RowView`s stacked in a scroll view showing at most `visibleRows` of them.
+final class ServiceListView: NSView {
+    var onScroll: ((CGFloat) -> Void)?
+    private let scrollView = NSScrollView()
+    private let rows: [RowView]
+
+    init(rows: [RowView], visibleRows: Int, scroll: CGFloat) {
+        let width = rows.map(\.frame.width).max() ?? 0
+        let content = FlippedView(frame: NSRect(x: 0, y: 0, width: width, height: rows.reduce(0) { $0 + $1.frame.height }))
+        var y: CGFloat = 0
+        for row in rows {
+            row.frame = NSRect(x: 0, y: y, width: width, height: row.frame.height)
+            row.autoresizingMask = [.width]
+            content.addSubview(row)
+            y += row.frame.height
+        }
+        let visible = rows.prefix(visibleRows).reduce(0) { $0 + $1.frame.height }
+        self.rows = rows
+        super.init(frame: NSRect(x: 0, y: 0, width: width, height: visible))
+        autoresizingMask = [.width]
+        scrollView.frame = bounds
+        scrollView.autoresizingMask = [.width, .height]
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = rows.count > visibleRows
+        scrollView.scrollerStyle = .overlay
+        scrollView.autohidesScrollers = true
+        scrollView.documentView = content
+        content.autoresizingMask = [.width]
+        addSubview(scrollView)
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: min(scroll, max(0, content.frame.height - visible))))
+        NotificationCenter.default.addObserver(self, selector: #selector(scrolled), name: NSView.boundsDidChangeNotification, object: scrollView.contentView)
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect], owner: self))
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func scrolled() {
+        onScroll?(scrollView.contentView.bounds.origin.y)
+        updateHover()
+    }
+
+    override func mouseMoved(with event: NSEvent) { updateHover() }
+    override func mouseEntered(with event: NSEvent) { updateHover() }
+    override func mouseExited(with event: NSEvent) { rows.forEach { $0.hovered = false } }
+
+    /// One owner for the highlight: rows scrolling under a still pointer get no enter/exit events of their own.
+    private func updateHover() {
+        guard let window, let content = scrollView.documentView else { return }
+        let inside = bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil))
+        let point = content.convert(window.mouseLocationOutsideOfEventStream, from: nil)
+        for row in rows { row.hovered = inside && row.frame.contains(point) }
+    }
+}
+
+/// Top-left origin, so rows stack downwards from the top of a scroll view.
+final class FlippedView: NSView {
+    override var isFlipped: Bool { true }
 }
 
 @MainActor
@@ -256,6 +328,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var generation = 0
     /// Right edge of the last rendered menu; kept while services load so their shorter "updating…" titles don't pull it in.
     private var titleEdge: CGFloat = 0
+    /// Scroll offset of the services list, carried across menu refills.
+    private var listScroll: CGFloat = 0
+    /// Services shown at once in the menu; more scroll.
+    private static let visibleServices = 8
     private var timer: Timer?
     private var settingsWindow: NSWindow?
     #if SPARKLE
@@ -347,7 +423,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setIcon(_ levels: [Level?], label: String) {
         guard let button = statusItem.button else { return }
-        button.image = Glyph.pie(levels, hole: 0.6)
+        button.image = Glyph.pie(iconSectors(levels), hole: 0.6)
         // Menu bar managers (Thaw, Ice, Bartender) key items by this label; a changing one reads as a new item.
         button.setAccessibilityLabel("HealthBar")
         button.setAccessibilityValue(label)
@@ -365,6 +441,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         var right = (rows.compactMap { $0.item.attributedTitle?.size().width }.max() ?? 0) + 20
         if pending > 0 { right = max(right, titleEdge) }
         titleEdge = right
+        var serviceRows: [RowView] = []
         for row in rows {
             let base = row.item.attributedTitle ?? NSAttributedString()
             let marked = { (highlighted: Bool) -> NSAttributedString in
@@ -378,15 +455,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 tip = tip.map { $0 + "\n\n" + note } ?? note
             }
             // Same height loaded or not, so the menu doesn't jump while services fill in.
-            row.item.view = RowView(
+            let view = RowView(
                 title: marked, days: row.uptime?.days.map(\.level) ?? Array(repeating: nil, count: StatusFetcher.historyDays),
                 percent: row.uptime.map { String(format: "%.2f %%", $0.percent) },
                 lead: 12 + NSAttributedString(string: "  ", attributes: [.font: NSFont.menuFont(ofSize: 0)]).size().width,
                 dayTips: row.uptime?.days.map(dayTip) ?? [], tip: tip,
                 rightEdge: RowView.textX + right, width: right + 2 * RowView.textX)
-            menu.addItem(row.item)
+            let url = row.item.representedObject as? URL
+            view.onClick = { if let url { NSWorkspace.shared.open(url) } }
+            serviceRows.append(view)
         }
-        if !config.services.isEmpty { menu.addItem(.separator()) }
+        if !serviceRows.isEmpty {
+            // One item holding all services, so they scroll inside the menu; a refill keeps the scroll position.
+            let list = ServiceListView(rows: serviceRows, visibleRows: Self.visibleServices, scroll: listScroll)
+            list.onScroll = { [weak self] in self?.listScroll = $0 }
+            let item = NSMenuItem()
+            item.view = list
+            menu.addItem(item)
+            menu.addItem(.separator())
+        }
 
         let updated = updatedAt.map { "Updated \(DateFormatter.localizedString(from: $0, dateStyle: .none, timeStyle: .short))" }
         menu.addItem(disabled(updated ?? "Updating…"))

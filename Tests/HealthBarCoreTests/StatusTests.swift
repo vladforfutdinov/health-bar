@@ -39,6 +39,22 @@ final class StatusTests: XCTestCase {
         XCTAssertEqual(IconState(levels: []), .unknown)
     }
 
+    func testIconSectors() {
+        XCTAssertEqual(iconSectors([.ok, .degraded, nil]), [.ok, .degraded, nil], "up to 10: one per service, in order")
+        let ok = [Level?](repeating: .ok, count: 60)
+        XCTAssertEqual(iconSectors(ok), Array(repeating: .ok, count: 10))
+        var oneDown = ok
+        oneDown[30] = .outage
+        XCTAssertEqual(iconSectors(oneDown).filter { $0 == .outage }.count, 1, "any problem shows")
+        var many = ok
+        for i in 0..<18 { many[i] = .degraded }
+        for i in 18..<24 { many[i] = .outage }
+        XCTAssertEqual(iconSectors(many), [.outage, .degraded, .degraded, .degraded] + Array(repeating: .ok, count: 6),
+                       "proportional: 6/60 → 1, 18/60 → 3, worst first")
+        XCTAssertEqual(iconSectors([Level?](repeating: nil, count: 30)), Array(repeating: nil, count: 10), "still loading")
+        XCTAssertEqual(iconSectors([Level?](repeating: .outage, count: 30) + [.degraded]).count, 10, "never more than the limit")
+    }
+
     func testStatusJSON() throws {
         let json = #"{"page":{"id":"x","name":"GitHub","url":"https://www.githubstatus.com"},"status":{"indicator":"major","description":"Partial System Outage"}}"#
         XCTAssertEqual(try decodeStatuspage(Data(json.utf8)).pageStatus, PageStatus(level: .outage, description: "Partial System Outage"))

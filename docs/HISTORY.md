@@ -85,3 +85,10 @@ Refresh (menu, wake, launch, config reload) clears every service to "updating…
 - Keyboard focus: opened from the status menu, the Settings window got no key events (Escape, typing) until clicked, though AppKit reported the app active and the window key. `activate(ignoringOtherApps: true)` run after the menu has closed fixes it; the same call during menu teardown, `NSApp.activate()`, and a non-activating `NSPanel` did not (checked with a key-event log in the VM).
 - Menu width and shortcuts: once a hidden twin titled "Settings…" was added, macOS reserved the shortcut column again (a blank band on the right), apparently because of the stock icon macOS 26 gives that title. `NSMenuDelegate.menuHasKeyEquivalent` and key equivalents on the view items themselves were tried and never fire while the menu is open (checked with ⌘Q in the VM, against a standard item where it does). Twins stay, untitled; Refresh, About, Settings and Quit are `RowView`s; right padding equals the left.
 - About icon: macOS 26 draws a legacy `.icns` app icon shrunk inside a grey rounded-square frame, which read blurry in the About panel. The panel gets the bundle's `AppIcon.icns` image directly (`.applicationIcon`). Finder and the Dock still show the framed icon; that needs an Icon Composer `.icon` asset.
+
+## 2026-11-10 — many services
+
+- With the catalog, the menu outgrew the screen. The services are one menu item holding a scroll view of `RowView`s, 8 visible; the scroll position survives the refills while data arrives. The list owns the hover highlight (rows scrolling under a still pointer get no enter/exit events) and the clicks.
+- The bar icon keeps one sector per service up to 10; beyond that 10 sectors, each problem status getting a share proportional to its count (at least one), worst first (`iconSectors`).
+- Checking a service in Settings saves at once; its data is fetched in the background (checked in the VM: the box flips within 0.15 s).
+- `design/status-icons.svg` has a 5-sector logo variant (`logo5`) in all status colours, for further design.

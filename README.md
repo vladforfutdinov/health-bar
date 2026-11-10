@@ -12,7 +12,7 @@ brew install --cask vladforfutdinov/healthbar/healthbar
 
 ## Icon
 
-The menu bar icon is a ring (donut) split into one sector per service, clockwise from 12 o'clock in config order. All green means every service is fine; a service's sector changes colour with its status:
+The menu bar icon is a ring (donut) split into one sector per checked service, clockwise from 12 o'clock in the order of the list. With more than 10 services it has 10 sectors: each problem status takes a share proportional to how many services have it (at least one sector), worst first, and green fills the rest. A sector's colour:
 
 | Colour | Status |
 |---|---|
@@ -41,7 +41,7 @@ Any Atlassian Statuspage or incident.io status page works; the platform is detec
 
 ## Menu
 
-Each service row shows its status and opens the status page; active incidents, or the fetch error, are in its tooltip. Under it a 30-day strip (one bar per day, worst component that day) and the uptime of its least available component. Hovering a bar lists that day's affected components with status and duration.
+At most 8 services show at once; the rest scroll. Each service row shows its status and opens the status page; active incidents, or the fetch error, are in its tooltip. Under it a 30-day strip (one bar per day, worst component that day) and the uptime of its least available component. Hovering a bar lists that day's affected components with status and duration.
 
 ## Data sources
 
