@@ -224,6 +224,28 @@ public struct Config: Codable, Equatable, Sendable {
         groups.insert(group, at: to + (after ? 1 : 0))
     }
 
+    /// Moves the page `url` up (negative) or down within its own list; stops at the ends.
+    public mutating func shift(_ url: URL, by offset: Int) {
+        guard let at = locate(url) else { return }
+        edit(at.group) { list in
+            let to = min(max(at.index + offset, 0), list.count - 1)
+            list.insert(list.remove(at: at.index), at: to)
+        }
+    }
+
+    /// Moves the group `id` up (negative) or down; stops at the ends.
+    public mutating func shiftGroup(_ id: String, by offset: Int) {
+        guard let from = groups.firstIndex(where: { $0.id == id }) else { return }
+        let to = min(max(from + offset, 0), groups.count - 1)
+        groups.insert(groups.remove(at: from), at: to)
+    }
+
+    /// Where the page `url` sits in its own list, and that list's length.
+    public func position(of url: URL) -> (index: Int, count: Int)? {
+        guard let at = locate(url) else { return nil }
+        return (at.index, at.group.map { groups[$0].services.count } ?? ungrouped.count)
+    }
+
     /// `group` is a group index, `nil` outside the groups.
     private func locate(_ url: URL) -> (group: Int?, index: Int)? {
         if let i = ungrouped.firstIndex(where: { $0.url == url }) { return (nil, i) }

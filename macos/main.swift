@@ -5,10 +5,13 @@ import Sparkle
 #endif
 
 enum Glyph {
-    case filled(NSColor), half(NSColor), ring(NSColor), dashed(NSColor)
+    case filled(NSColor), half(NSColor), ring(NSColor), dashed(NSColor), dotted(NSColor)
 
+    /// With "Differentiate without color" on, maintenance gets a centre dot so it isn't told from OK by hue alone.
     init(_ level: Level) {
         switch level {
+        case .maintenance where NSWorkspace.shared.accessibilityDisplayShouldDifferentiateWithoutColor:
+            self = .dotted(Self.color(level))
         case .ok, .maintenance: self = .filled(Self.color(level))
         case .degraded: self = .half(Self.color(level))
         case .outage: self = .ring(Self.color(level))
@@ -42,6 +45,11 @@ enum Glyph {
                 color.setStroke()
                 ring.setLineDash([2.2 * u, 2.2 * u], count: 2, phase: 0)
                 ring.stroke()
+            case .dotted(let color):
+                color.setFill()
+                NSBezierPath(ovalIn: r.insetBy(dx: 1.5 * u, dy: 1.5 * u)).fill()
+                NSColor.white.setFill()
+                NSBezierPath(ovalIn: r.insetBy(dx: 6 * u, dy: 6 * u)).fill()
             }
             return true
         }
@@ -72,13 +80,23 @@ enum Glyph {
 
     /// Menu bar icon: one sector per service, clockwise from 12 o'clock in config order.
     /// Adjacent sectors of one colour are drawn as a single arc, so an all-green bar has no seams.
-    /// - Parameter hole: inner radius as a fraction of the outer one; 0 draws a pie, > 0 a donut.
-    static func pie(_ levels: [Level?], hole: CGFloat = 0, size: CGFloat = 16) -> NSImage {
+    /// - Parameters:
+    ///   - hole: inner radius as a fraction of the outer one; 0 draws a pie, > 0 a donut.
+    ///   - mark: a character drawn in the hole, for status without colour.
+    static func pie(_ levels: [Level?], hole: CGFloat = 0, mark: String? = nil, size: CGFloat = 16) -> NSImage {
         let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { r in
             let u = r.width / 16
             let c = NSPoint(x: r.midX, y: r.midY)
             let disc = r.insetBy(dx: 1.5 * u, dy: 1.5 * u)
             let outer = disc.width / 2, inner = outer * hole
+            func drawMark() {
+                guard let mark else { return }
+                let text = NSAttributedString(string: mark, attributes: [
+                    .font: NSFont.systemFont(ofSize: 7.5 * u, weight: .heavy), .foregroundColor: NSColor.labelColor,
+                ])
+                let size = text.size()
+                text.draw(at: NSPoint(x: c.x - size.width / 2, y: c.y - size.height / 2))
+            }
             let n = levels.count
             guard n > 0, let start = (0..<n).first(where: { levels[$0] != levels[($0 + n - 1) % n] }) else {
                 color(levels.first ?? nil).setFill()
@@ -88,6 +106,7 @@ enum Glyph {
                     ring.windingRule = .evenOdd
                 }
                 ring.fill()
+                drawMark()
                 return true
             }
             let step = 360 / CGFloat(n)
@@ -110,6 +129,7 @@ enum Glyph {
                 sector.fill()
                 t += len
             }
+            drawMark()
             return true
         }
         image.isTemplate = false
@@ -159,7 +179,14 @@ final class RowView: NSView, NSViewToolTipOwner {
     private let rightEdge: CGFloat
     private let top: CGFloat
     private let closesMenu: Bool
+    private let note: String?
     private var tips: [NSView.ToolTipTag: String] = [:]
+    private static let noteFont = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+
+    /// Uptime as the user's locale writes a percentage, two decimals.
+    static func percentText(_ percent: Double) -> String {
+        (percent / 100).formatted(.percent.precision(.fractionLength(2)))
+    }
 
     /// - Parameters:
     ///   - days: strip bars, oldest first; `nil` for a single-line row.
@@ -169,26 +196,32 @@ final class RowView: NSView, NSViewToolTipOwner {
     ///   - tip: tooltip for the rest of the row.
     ///   - rightEdge: where the percentage ends, in view coordinates; the strip stretches up to it.
     ///   - closesMenu: `false` keeps the menu open after the click.
+    ///   - note: a third line under the strip (an incident or the fetch error), truncated to the row.
+    ///   - label: what VoiceOver reads; defaults to the title's text.
     init(title: @escaping (Bool) -> NSAttributedString, days: [Level?]?, percent: String? = nil, lead: CGFloat = 0,
-         dayTips: [String] = [], tip: String? = nil, rightEdge: CGFloat, width: CGFloat, closesMenu: Bool = true) {
+         dayTips: [String] = [], tip: String? = nil, rightEdge: CGFloat, width: CGFloat, closesMenu: Bool = true,
+         note: String? = nil, label: String? = nil) {
         self.title = title
         self.percent = percent
+        self.note = note
         self.rightEdge = rightEdge
         self.closesMenu = closesMenu
         stripX = Self.textX + lead
         // Every row reserves the widest percentage, so all strips end at the same x.
-        let widest = ceil(NSAttributedString(string: "100.00 %", attributes: [.font: Self.percentFont]).size().width)
+        let widest = ceil(NSAttributedString(string: Self.percentText(100), attributes: [.font: Self.percentFont]).size().width)
         let span = rightEdge - widest - Self.percentGap - stripX - 2 * Glyph.stripFrame + Glyph.stripGap
         let bar = days.map { max(Glyph.stripBar, span / CGFloat(max($0.count, 1)) - Glyph.stripGap) } ?? Glyph.stripBar
         strip = days.map { Glyph.strip($0, bar: bar) }
         let line = ceil(title(false).size().height)
         top = strip == nil ? 3 : 4
-        let height = top + line + (strip.map { Self.gap + $0.size.height + 5 } ?? 3)
+        let noteHeight = note == nil ? 0 : 2 + ceil(Self.noteFont.ascender - Self.noteFont.descender + Self.noteFont.leading)
+        let height = top + line + (strip.map { Self.gap + $0.size.height + noteHeight + 5 } ?? 3)
         super.init(frame: NSRect(x: 0, y: 0, width: width, height: height))
         autoresizingMask = [.width]
         setAccessibilityElement(true)
         setAccessibilityRole(.menuItem)
-        setAccessibilityLabel(title(false).string)
+        setAccessibilityLabel(label ?? title(false).string.replacingOccurrences(of: "\u{FFFC}", with: "").replacingOccurrences(of: "\t", with: " ")
+            .trimmingCharacters(in: .whitespaces))
 
         let stripY = top + line + Self.gap
         addTip(NSRect(x: 0, y: 0, width: width, height: stripY), tip)
@@ -232,12 +265,28 @@ final class RowView: NSView, NSViewToolTipOwner {
         guard let strip else { return }
         let y = top + ceil(line.size().height) + Self.gap
         strip.draw(in: NSRect(origin: NSPoint(x: stripX, y: y), size: strip.size), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        let secondary = highlighted ? NSColor.selectedMenuItemTextColor : NSColor.secondaryLabelColor
+        if let note {
+            let style = NSMutableParagraphStyle()
+            style.lineBreakMode = .byTruncatingTail
+            NSAttributedString(string: note, attributes: [.font: Self.noteFont, .foregroundColor: secondary, .paragraphStyle: style])
+                .draw(in: NSRect(x: stripX, y: y + strip.size.height + 2, width: rightEdge - stripX, height: bounds.height - y - strip.size.height))
+        }
         guard let percent else { return }
-        let text = NSAttributedString(string: percent, attributes: [
-            .font: Self.percentFont,
-            .foregroundColor: highlighted ? NSColor.selectedMenuItemTextColor : NSColor.secondaryLabelColor,
-        ])
+        let text = NSAttributedString(string: percent, attributes: [.font: Self.percentFont, .foregroundColor: secondary])
         text.draw(at: NSPoint(x: rightEdge - text.size().width, y: y + (strip.size.height - text.size().height) / 2))
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        if let onClick {
+            enclosingMenuItem?.menu?.cancelTracking()
+            RunLoop.main.perform(inModes: [.common], block: onClick)
+            return true
+        }
+        guard let item = enclosingMenuItem, let action = item.action else { return false }
+        if closesMenu { item.menu?.cancelTracking() }
+        RunLoop.main.perform(inModes: [.common]) { NSApp.sendAction(action, to: item.target, from: item) }
+        return true
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -269,16 +318,19 @@ final class ServiceListView: NSView {
             content.addSubview(row)
             y += row.frame.height
         }
-        let visible = rows.prefix(visibleRows).reduce(0) { $0 + $1.frame.height }
+        // Half of the next row peeks out, so the list reads as scrollable.
+        let overflow = rows.count > visibleRows
+        let visible = rows.prefix(visibleRows).reduce(0) { $0 + $1.frame.height } + (overflow ? rows[visibleRows].frame.height / 2 : 0)
         self.rows = rows
         super.init(frame: NSRect(x: 0, y: 0, width: width, height: visible))
         autoresizingMask = [.width]
         scrollView.frame = bounds
         scrollView.autoresizingMask = [.width, .height]
         scrollView.drawsBackground = false
-        scrollView.hasVerticalScroller = rows.count > visibleRows
-        scrollView.scrollerStyle = .overlay
-        scrollView.autohidesScrollers = true
+        // Always shown when the list scrolls; it sits in the rows' right padding.
+        scrollView.hasVerticalScroller = overflow
+        scrollView.scrollerStyle = .legacy
+        scrollView.autohidesScrollers = false
         scrollView.documentView = content
         content.autoresizingMask = [.width]
         addSubview(scrollView)
@@ -297,7 +349,7 @@ final class ServiceListView: NSView {
 
     override func mouseMoved(with event: NSEvent) { updateHover() }
     override func mouseEntered(with event: NSEvent) { updateHover() }
-    override func mouseExited(with event: NSEvent) { rows.forEach { $0.hovered = false } }
+    override func mouseExited(with event: NSEvent) { clearHighlight() }
 
     /// One owner for the highlight: rows scrolling under a still pointer get no enter/exit events of their own.
     private func updateHover() {
@@ -305,6 +357,10 @@ final class ServiceListView: NSView {
         let inside = bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil))
         let point = content.convert(window.mouseLocationOutsideOfEventStream, from: nil)
         for row in rows { row.hovered = inside && row.frame.contains(point) }
+    }
+
+    func clearHighlight() {
+        rows.forEach { $0.hovered = false }
     }
 }
 
@@ -330,6 +386,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var titleEdge: CGFloat = 0
     /// Scroll offset of the services list, carried across menu refills.
     private var listScroll: CGFloat = 0
+    private weak var serviceList: ServiceListView?
     /// Services shown at once in the menu; more scroll.
     private static let visibleServices = 8
     private var timer: Timer?
@@ -347,6 +404,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.autosaveName = Bundle.main.bundleIdentifier ?? "HealthBar"
         menu.autoenablesItems = false
         menu.showsStateColumn = false
+        menu.delegate = self
         statusItem.menu = menu
         setIcon([], label: "loading")
         config = Config.load()
@@ -354,6 +412,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         refresh()
         NSWorkspace.shared.notificationCenter.addObserver(
             self, selector: #selector(refresh), name: NSWorkspace.didWakeNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(displayOptionsChanged), name: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil)
     }
 
     private func startTimer() {
@@ -378,6 +438,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pending = 0
         poll(force: false)
     }
+
+    @objc private func displayOptionsChanged() { render() }
+
+
 
     /// Launch, wake and the Refresh item drop what is shown and read everything again, details included.
     @objc private func refresh() {
@@ -417,13 +481,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func render() {
         let levels = states.map { try? $0.status?.get().level }
-        setIcon(levels, label: updatedAt == nil ? "loading" : "\(IconState(levels: levels))")
+        setIcon(levels, label: summary(levels))
         fillMenu()
+    }
+
+    /// The icon's state as a sentence, for VoiceOver and the tooltip.
+    private func summary(_ levels: [Level?]) -> String {
+        guard updatedAt != nil else { return "Loading" }
+        let names = zip(config.services, levels).filter { $0.1 != .ok && $0.1 != nil }.map(\.0.name)
+        let total = String(AttributedString(localized: "^[\(levels.count) service](inflect: true)").characters)
+        if names.isEmpty { return "All \(total) operational" }
+        return "\(names.count) of \(total) with problems: " + names.prefix(3).joined(separator: ", ") + (names.count > 3 ? "…" : "")
     }
 
     private func setIcon(_ levels: [Level?], label: String) {
         guard let button = statusItem.button else { return }
-        button.image = Glyph.pie(iconSectors(levels), hole: 0.6)
+        var mark: String?
+        if NSWorkspace.shared.accessibilityDisplayShouldDifferentiateWithoutColor {
+            switch levels.compactMap({ $0 }).max() {
+            case .outage: mark = "!"
+            case .degraded: mark = "~"
+            default: mark = nil
+            }
+        }
+        button.image = Glyph.pie(iconSectors(levels), hole: 0.6, mark: mark)
         // Menu bar managers (Thaw, Ice, Bartender) key items by this label; a changing one reads as a new item.
         button.setAccessibilityLabel("HealthBar")
         button.setAccessibilityValue(label)
@@ -436,7 +517,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.removeAllItems()
         let rows = config.services.enumerated().map { i, service in
             let state = i < states.count ? states[i] : ServiceState()
-            return (item: serviceItem(service, state), uptime: state.details?.uptime)
+            return (item: serviceItem(service, state), uptime: state.details?.uptime, service: service, state: state)
         }
         var right = (rows.compactMap { $0.item.attributedTitle?.size().width }.max() ?? 0) + 20
         if pending > 0 { right = max(right, titleEdge) }
@@ -457,10 +538,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Same height loaded or not, so the menu doesn't jump while services fill in.
             let view = RowView(
                 title: marked, days: row.uptime?.days.map(\.level) ?? Array(repeating: nil, count: StatusFetcher.historyDays),
-                percent: row.uptime.map { String(format: "%.2f %%", $0.percent) },
+                percent: row.uptime.map { RowView.percentText($0.percent) },
                 lead: 12 + NSAttributedString(string: "  ", attributes: [.font: NSFont.menuFont(ofSize: 0)]).size().width,
                 dayTips: row.uptime?.days.map(dayTip) ?? [], tip: tip,
-                rightEdge: RowView.textX + right, width: right + 2 * RowView.textX)
+                rightEdge: RowView.textX + right, width: right + 2 * RowView.textX,
+                note: Self.note(row.state), label: Self.spoken(row.service, row.state))
             let url = row.item.representedObject as? URL
             view.onClick = { if let url { NSWorkspace.shared.open(url) } }
             serviceRows.append(view)
@@ -468,10 +550,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !serviceRows.isEmpty {
             // One item holding all services, so they scroll inside the menu; a refill keeps the scroll position.
             let list = ServiceListView(rows: serviceRows, visibleRows: Self.visibleServices, scroll: listScroll)
+            serviceList = list
             list.onScroll = { [weak self] in self?.listScroll = $0 }
             let item = NSMenuItem()
             item.view = list
             menu.addItem(item)
+
             menu.addItem(.separator())
         }
 
@@ -484,6 +568,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(row(action("Settings…", #selector(openSettings)), key: ",", rightEdge: right))
         menu.addItem(.separator())
         menu.addItem(row(action("Quit HealthBar", #selector(quit)), key: "q", rightEdge: right))
+    }
+
+    /// Third line of a service row: the first active incident (and how many more), or why it couldn't be read.
+    private static func note(_ state: ServiceState) -> String? {
+        switch state.status {
+        case .failure(let error): return error.localizedDescription
+        case .success:
+            guard let incidents = state.details?.incidents, let first = incidents.first else { return nil }
+            return "\(first.name) — \(first.stage)" + (incidents.count > 1 ? "  +\(incidents.count - 1) more" : "")
+        case nil: return nil
+        }
+    }
+
+    /// What VoiceOver reads for a service row.
+    private static func spoken(_ service: ServiceConfig, _ state: ServiceState) -> String {
+        var parts = [service.name]
+        switch state.status {
+        case nil: parts.append("updating")
+        case .failure: parts.append("unreachable")
+        case .success(let page): parts.append(page.description)
+        }
+        if let uptime = state.details?.uptime { parts.append("\(RowView.percentText(uptime.percent)) uptime over \(uptime.days.count) days") }
+        if let note = note(state) { parts.append(note) }
+        return parts.joined(separator: ", ")
     }
 
     private static func whitened(_ title: NSAttributedString) -> NSAttributedString {
@@ -652,7 +760,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.contentViewController = NSHostingController(rootView: SettingsView(model: model))
             window.title = "HealthBar Settings"
             window.isReleasedWhenClosed = false
-            window.center()
+            // Reopens where it was last closed; centred the first time.
+            if !window.setFrameUsingName("Settings") { window.center() }
+            window.setFrameAutosaveName("Settings")
             settingsWindow = window
         }
         bringForward(settingsWindow)
@@ -665,6 +775,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.activate(ignoringOtherApps: true)
             window?.makeKeyAndOrderFront(nil)
         }
+    }
+}
+
+extension AppDelegate: NSMenuDelegate {
+    func menuDidClose(_ menu: NSMenu) {
+        serviceList?.clearHighlight()
     }
 }
 

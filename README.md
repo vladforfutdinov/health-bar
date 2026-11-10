@@ -22,6 +22,8 @@ The menu bar icon is a ring (donut) split into one sector per checked service, c
 | blue | maintenance |
 | grey | not fetched (unreachable or still loading) |
 
+With *Differentiate without color* on (System Settings → Accessibility → Display), the icon shows `!` in its centre when a service is down and `~` when one is degraded, and maintenance glyphs in the menu get a centre dot.
+
 In the menu each service carries its own glyph (`design/status-icons.svg`).
 
 ## Settings
@@ -30,8 +32,8 @@ Menu → Settings… (⌘,); Escape closes it. Menu → About HealthBar shows th
 
 - **Services**: a built-in list of about 60 developer-service status pages in groups (Git, CI; AI; Hosting, cloud; Databases; Packages; Monitoring; Auth, secrets, network; Email, messaging, media; Work tools); GitHub, OpenAI, Claude, Vercel and Supabase are checked by default. Check the ones to show. Services can also sit outside any group, at the top.
   - New Service… / the pencil after a service's address: address, name (empty takes the page's own) and group. The address is checked when the field loses focus (a green check means its `status.json` answers) and again on save. Delete… is in the same sheet, with a confirmation.
-  - New Group… / the pencil on a group: its name, and Delete…, which asks whether to keep the group's services (they move out of the group) or delete them too.
-  - Drag services and groups by the dotted grip at the row's end; services can move between groups. Groups fold (Fold all / Unfold all). The menu and the icon's sectors follow the order of the checked services.
+  - New Group… / the pencil on a group: its name, and Delete…, which offers Delete Group Only (its services move out of the group) or Delete Group and Services.
+  - Drag rows to reorder within a group, and groups among themselves. The context menu has Move Up, Move Down, Move to Group, Edit… and Delete…. Expand All / Collapse All folds the groups. The menu and the icon's sectors follow the order of the checked services.
   - Deleted built-in pages stay deleted. The list is in `Core/Catalog.swift`.
 - **Check status every**: 30 seconds to 15 minutes.
 - **Launch at Login**.
@@ -41,7 +43,7 @@ Any Atlassian Statuspage or incident.io status page works; the platform is detec
 
 ## Menu
 
-At most 8 services show at once; the rest scroll. Each service row shows its status and opens the status page; active incidents, or the fetch error, are in its tooltip. Under it a 30-day strip (one bar per day, worst component that day) and the uptime of its least available component. Hovering a bar lists that day's affected components with status and duration.
+Eight and a half services show at once, with a scroll bar for the rest. Each service row shows its status and opens the status page. A service with an active incident or a fetch error gets a third line with the first incident (and how many more) or the error; the full list is in its tooltip. Under it a 30-day strip (one bar per day, worst component that day) and the uptime of its least available component. Hovering a bar lists that day's affected components with status and duration.
 
 ## Data sources
 

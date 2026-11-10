@@ -121,57 +121,11 @@ private struct GroupDraft: Identifiable {
     var id: String { group?.id ?? "new" }
 }
 
-/// Where a drag would land: before or after the row `key`.
-private struct DropMark: Equatable {
-    var key: String
-    var after: Bool
-}
-
-/// The insertion line's state. `dragging` turns on when a drag enters a row and off at the drop, so the extra
-/// `dropUpdated` macOS 26 sends after `performDrop` can't bring the line back.
-private struct DropState: Equatable {
-    var mark: DropMark?
-    var dragging = false
-}
-
-/// Drop target over one row: tracks which half the pointer is in for the insertion line, then hands over the payload.
-private struct RowDrop: DropDelegate {
-    let key: String
-    let height: CGFloat
-    @Binding var state: DropState
-    let perform: (_ payload: String, _ after: Bool) -> Void
-
-    func dropEntered(info: DropInfo) {
-        state.dragging = true
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        if state.dragging { state.mark = DropMark(key: key, after: info.location.y > height / 2) }
-        return DropProposal(operation: .move)
-    }
-
-    func dropExited(info: DropInfo) {
-        if state.mark?.key == key { state.mark = nil }
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        let after = info.location.y > height / 2
-        state = DropState()
-        guard let provider = info.itemProviders(for: [.plainText]).first else { return false }
-        _ = provider.loadObject(ofClass: NSString.self) { item, _ in
-            DispatchQueue.main.async {
-                if let payload = item as? String { perform(payload, after) }
-            }
-        }
-        return true
-    }
-}
-
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
     /// Unfolded group ids; at first those with something enabled.
     @State private var expanded: Set<String>
-    @State private var drop = DropState()
+    @State private var removing: Removal?
     @State private var editingGroup: GroupDraft?
     @State private var editing: ServiceDraft?
 
@@ -231,6 +185,20 @@ struct SettingsView: View {
                 if let id = draft.group?.id { model.config.removeGroup(id, keepingServices: keepServices) }
             }
         }
+        .alert(removalTitle, isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }), presenting: removing) { removal in
+            switch removal {
+            case .service(let url, _):
+                Button("Delete", role: .destructive) { model.config.remove(url) }
+                Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+            case .group(let g):
+                groupDeletionButtons(g) { model.config.removeGroup(g.id, keepingServices: $0) }
+            }
+        } message: { removal in
+            switch removal {
+            case .service: Text("This can’t be undone.")
+            case .group(let g): Text(deleteGroupMessage(g))
+            }
+        }
         .sheet(item: $editing) { draft in
             ServiceSheet(draft: draft, groups: model.config.groups, probe: model.probe) { draft in
                 let problem = await model.save(draft)
@@ -248,7 +216,7 @@ struct SettingsView: View {
             HStack {
                 Text("Services").font(.headline)
                 Spacer()
-                Button(allExpanded ? "Fold all" : "Unfold all") {
+                Button(allExpanded ? "Collapse All" : "Expand All") {
                     expanded = allExpanded ? [] : Set(model.config.groups.map(\.id))
                 }
                 .buttonStyle(.link)
@@ -257,6 +225,7 @@ struct SettingsView: View {
                 ForEach($model.config.ungrouped, id: \.url) { $service in
                     serviceRow($service, in: Config.noGroup)
                 }
+                .onMove { model.config.ungrouped.move(fromOffsets: $0, toOffset: $1) }
                 ForEach(model.config.groups) { group in
                     DisclosureGroup(isExpanded: Binding(
                         get: { expanded.contains(group.id) },
@@ -265,10 +234,15 @@ struct SettingsView: View {
                         ForEach(groupServices(group.id), id: \.wrappedValue.url) { service in
                             serviceRow(service, in: group.id)
                         }
+                        .onMove { from, to in
+                            guard let g = model.config.groups.firstIndex(where: { $0.id == group.id }) else { return }
+                            model.config.groups[g].services.move(fromOffsets: from, toOffset: to)
+                        }
                     } label: {
                         groupHeader(group)
                     }
                 }
+                .onMove { model.config.groups.move(fromOffsets: $0, toOffset: $1) }
             }
             .listStyle(.bordered(alternatesRowBackgrounds: false))
             .frame(height: 320)
@@ -279,7 +253,7 @@ struct SettingsView: View {
                     editing = ServiceDraft(original: nil, address: "", name: "", group: Config.noGroup)
                 }
             }
-            Text("Any Statuspage or incident.io status page. Drag services and groups by their grip to reorder; services can move between groups. The menu and the icon's sectors follow the order of the checked services.")
+            Text("Any Statuspage or incident.io status page. Drag rows to reorder; to move a service to another group, use Move to Group in its context menu. The menu and the icon's sectors follow the order of the checked services.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -299,59 +273,110 @@ struct SettingsView: View {
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
             .help(help)
+            .accessibilityLabel(help)
     }
 
     private func serviceRow(_ service: Binding<ServiceConfig>, in group: String) -> some View {
         let s = service.wrappedValue
-        let key = "service:" + s.url.absoluteString
+        let position = model.config.position(of: s.url)
+        let edit = { editing = ServiceDraft(original: s.url, address: s.url.absoluteString, name: s.name, group: group) }
         return HStack {
             Toggle(s.name, isOn: service.enabled).toggleStyle(.checkbox)
             Spacer()
             Text(s.url.host ?? s.url.absoluteString).foregroundStyle(.secondary)
-            pencil("Edit \(s.name)") {
-                editing = ServiceDraft(original: s.url, address: s.url.absoluteString, name: s.name, group: group)
-            }
+            pencil("Edit \(s.name)", action: edit)
             Grip()
         }
-        .contentShape(Rectangle())
-        .draggable(key) { Text(s.name).padding(4) }
-        .modifier(DropZone(key: key, state: $drop) { payload, after in
-            guard let url = Self.serviceURL(payload) else { return }
-            model.config.move(url, to: s.url, after: after)
-        })
+        .contextMenu {
+            Button("Move Up") { model.config.shift(s.url, by: -1) }
+                .disabled(position?.index == 0)
+            Button("Move Down") { model.config.shift(s.url, by: 1) }
+                .disabled(position.map { $0.index == $0.count - 1 } ?? true)
+            Menu("Move to Group") {
+                Button("No Group") { moveService(s, to: Config.noGroup) }
+                    .disabled(group == Config.noGroup)
+                Divider()
+                ForEach(model.config.groups) { g in
+                    Button(g.name) { moveService(s, to: g.id) }
+                        .disabled(g.id == group)
+                }
+            }
+            Divider()
+            Button("Edit…", action: edit)
+            Button("Delete…") { removing = .service(s.url, name: s.name) }
+        }
+    }
+
+    private var removalTitle: String {
+        switch removing {
+        case .service(_, let name): return deleteServiceTitle(name)
+        case .group(let g): return deleteGroupTitle(g)
+        case nil: return ""
+        }
+    }
+
+    private func moveService(_ s: ServiceConfig, to group: String) {
+        model.config.replace(s.url, with: s, inGroup: group)
+        if group != Config.noGroup { expanded.insert(group) }
     }
 
     private func groupHeader(_ g: ServiceGroup) -> some View {
-        let key = "group:" + g.id
+        let index = model.config.groups.firstIndex { $0.id == g.id }
         return HStack {
             Text(g.name).fontWeight(.medium)
             Spacer()
-            pencil("Edit the group") { editingGroup = GroupDraft(group: g) }
+            pencil("Edit the group \(g.name)") { editingGroup = GroupDraft(group: g) }
             Grip()
         }
-        .contentShape(Rectangle())
-        .help("Drag to reorder; drop a service here to move it to the top of this group")
-        .draggable(key) { Text(g.name).padding(4) }
-        .modifier(DropZone(key: key, state: $drop) { payload, after in
-            if let url = Self.serviceURL(payload) {
-                model.config.move(url, intoGroup: g.id)
-                expanded.insert(g.id)
-            } else if payload.hasPrefix("group:") {
-                model.config.moveGroup(String(payload.dropFirst(6)), to: g.id, after: after)
-            }
-        })
+        .contextMenu {
+            Button("Move Up") { model.config.shiftGroup(g.id, by: -1) }
+                .disabled(index == 0)
+            Button("Move Down") { model.config.shiftGroup(g.id, by: 1) }
+                .disabled(index == model.config.groups.count - 1)
+            Divider()
+            Button("Edit…") { editingGroup = GroupDraft(group: g) }
+            Button("Delete…") { removing = .group(g) }
+        }
     }
 
-    private static func serviceURL(_ payload: String) -> URL? {
-        payload.hasPrefix("service:") ? URL(string: String(payload.dropFirst(8))) : nil
-    }
-
+    /// "30 seconds", "1 minute"… in the user's language.
     private static func interval(_ seconds: Int) -> String {
-        seconds < 60 ? "\(seconds) seconds" : seconds == 60 ? "minute" : "\(seconds / 60) minutes"
+        let f = DateComponentsFormatter()
+        f.unitsStyle = .full
+        f.allowedUnits = [.second, .minute]
+        return f.string(from: TimeInterval(seconds)) ?? "\(seconds) s"
     }
 }
 
-/// Drag handle: two columns of three 2-pt dots on a 4-pt pitch, pixel-aligned; the pointer turns into an open hand over it.
+/// A deletion from a context menu, waiting for confirmation.
+private enum Removal {
+    case service(URL, name: String)
+    case group(ServiceGroup)
+}
+
+private func deleteServiceTitle(_ name: String) -> String { "Delete “\(name)”?" }
+
+private func deleteGroupTitle(_ group: ServiceGroup) -> String { "Delete “\(group.name)”?" }
+
+private func deleteGroupMessage(_ group: ServiceGroup) -> String {
+    guard !group.services.isEmpty else { return "This can’t be undone." }
+    let count = String(AttributedString(localized: "^[\(group.services.count) service](inflect: true)").characters)
+    return "It has \(count). Delete Group Only moves them out of the group. This can’t be undone."
+}
+
+/// Both delete buttons are destructive, so Return lands on Cancel.
+@ViewBuilder
+private func groupDeletionButtons(_ group: ServiceGroup, delete: @escaping (_ keepServices: Bool) -> Void) -> some View {
+    if group.services.isEmpty {
+        Button("Delete", role: .destructive) { delete(false) }
+    } else {
+        Button("Delete Group Only", role: .destructive) { delete(true) }
+        Button("Delete Group and Services", role: .destructive) { delete(false) }
+    }
+    Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+}
+
+/// Drag handle mark: two columns of three 2-pt dots on a 4-pt pitch, pixel-aligned. The whole row drags; this only shows that it can.
 private struct Grip: View {
     var body: some View {
         Canvas { context, _ in
@@ -365,11 +390,7 @@ private struct Grip: View {
         .foregroundStyle(.secondary)
         .padding(.horizontal, 4)
         .padding(.vertical, 3)
-        .contentShape(Rectangle())
-        .onHover { inside in
-            if inside { NSCursor.openHand.push() } else { NSCursor.pop() }
-        }
-        .help("Drag to reorder")
+        .accessibilityHidden(true)
     }
 }
 
@@ -428,12 +449,14 @@ private struct ServiceSheet: View {
                 if let original = draft.original {
                     Button("Delete…", role: .destructive) { confirmingDelete = true }
                         .disabled(saving)
-                        .alert("Delete \(draft.name.isEmpty ? original.host ?? "" : draft.name)?", isPresented: $confirmingDelete) {
+                        .alert(deleteServiceTitle(draft.name.isEmpty ? original.host ?? "" : draft.name), isPresented: $confirmingDelete) {
                             Button("Delete", role: .destructive) {
                                 delete(original)
                                 dismiss()
                             }
-                            Button("Cancel", role: .cancel) {}
+                            Button("Cancel", role: .cancel) {}.keyboardShortcut(.defaultAction)
+                        } message: {
+                            Text("This can’t be undone.")
                         }
                 }
                 if saving { ProgressView().controlSize(.small) }
@@ -458,8 +481,10 @@ private struct ServiceSheet: View {
             ProgressView().controlSize(.small)
         } else if answers == true {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).help("status.json answers")
+                .accessibilityLabel("Status page found")
         } else if answers == false {
             Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red).help("No status page at this address")
+                .accessibilityLabel("No status page at this address")
         }
     }
 
@@ -518,18 +543,10 @@ private struct GroupSheet: View {
             HStack {
                 if let group {
                     Button("Delete…", role: .destructive) { confirmingDelete = true }
-                        .alert("Delete the group \(group.name)?", isPresented: $confirmingDelete) {
-                            if group.services.isEmpty {
-                                Button("Delete", role: .destructive) { remove(keeping: false) }
-                            } else {
-                                Button("Keep Services") { remove(keeping: true) }
-                                Button("Delete Services Too", role: .destructive) { remove(keeping: false) }
-                            }
-                            Button("Cancel", role: .cancel) {}
+                        .alert(deleteGroupTitle(group), isPresented: $confirmingDelete) {
+                            groupDeletionButtons(group) { remove(keeping: $0) }
                         } message: {
-                            if !group.services.isEmpty {
-                                Text("It has \(group.services.count) service\(group.services.count == 1 ? "" : "s"). Kept services move out of the group.")
-                            }
+                            Text(deleteGroupMessage(group))
                         }
                 }
                 Spacer()
@@ -555,29 +572,7 @@ private struct GroupSheet: View {
     }
 }
 
-/// Accepts drops on a row and draws the blue insertion line above or below it.
-private struct DropZone: ViewModifier {
-    let key: String
-    @Binding var state: DropState
-    let perform: (_ payload: String, _ after: Bool) -> Void
-
-    func body(content: Content) -> some View {
-        let mark = state.mark?.key == key ? state.mark : nil
-        content
-            .overlay(alignment: mark?.after == true ? .bottom : .top) {
-                if let mark {
-                    Rectangle().fill(Color.accentColor).frame(height: 2).offset(y: mark.after ? 3 : -3)
-                }
-            }
-            .overlay {
-                GeometryReader { geo in
-                    Color.clear.onDrop(of: [.plainText], delegate: RowDrop(key: key, height: geo.size.height, state: $state, perform: perform))
-                }
-            }
-    }
-}
-
-/// Edit and window commands for the Settings window's text fields: an accessory app has no visible menu bar,
+/// ⌘Q, edit commands for the Settings window's text fields and ⌘W: an accessory app has no visible menu bar,
 /// but key equivalents still go through `NSApp.mainMenu`.
 @MainActor
 func editingMainMenu() -> NSMenu {
@@ -589,10 +584,12 @@ func editingMainMenu() -> NSMenu {
     edit.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
     edit.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
     edit.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+    let app = NSMenu(title: "HealthBar")
+    app.addItem(withTitle: "Quit HealthBar", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     let window = NSMenu(title: "Window")
     window.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
     let main = NSMenu()
-    for sub in [NSMenu(title: "HealthBar"), edit, window] {
+    for sub in [app, edit, window] {
         let item = NSMenuItem(title: sub.title, action: nil, keyEquivalent: "")
         item.submenu = sub
         main.addItem(item)

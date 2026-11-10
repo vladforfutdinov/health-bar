@@ -345,6 +345,21 @@ final class StatusTests: XCTestCase {
         XCTAssertEqual(stored.ungrouped, [], "stored before ungrouped existed")
     }
 
+    func testShiftingServicesAndGroups() {
+        var c = Config.default
+        let gh = c.groups[0].services[0].url, bb = c.groups[0].services[1].url
+        c.shift(gh, by: 1)
+        XCTAssertEqual(c.groups[0].services.prefix(2).map(\.url), [bb, gh])
+        c.shift(gh, by: -5)
+        XCTAssertEqual(c.groups[0].services.first?.url, gh, "stops at the top")
+        XCTAssertEqual(c.position(of: gh)?.index, 0)
+        XCTAssertEqual(c.position(of: gh)?.count, c.groups[0].services.count)
+        c.shiftGroup("AI", by: -1)
+        XCTAssertEqual(c.groups.prefix(2).map(\.id), ["AI", "Git, CI"])
+        c.shiftGroup("AI", by: -1)
+        XCTAssertEqual(c.groups.first?.id, "AI", "stops at the top")
+    }
+
     func testPageURLFromTypedText() {
         XCTAssertEqual(ServiceConfig.pageURL(from: " status.example.com/ ")?.absoluteString, "https://status.example.com")
         XCTAssertEqual(ServiceConfig.pageURL(from: "http://x.example//")?.absoluteString, "http://x.example")

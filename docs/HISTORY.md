@@ -99,3 +99,14 @@ Refresh (menu, wake, launch, config reload) clears every service to "updating…
 - `StatusFetcher` uses a session with `timeoutIntervalForResource = 30`: the request timeout counts only idle time, and one trickling page kept `pending > 0`, which skips every timer poll.
 - Reviewed and left: results applied via `RunLoop.main.perform` were suspected of waiting for the next event with the menu closed; not seen in the VM (the icon filled in sector by sector with no input). A Statuspage host answering 200 with HTML on incident.io's `component_impacts` path would be cached as incident.io; not observed.
 - App icon now comes from `design/g2.svg` (the 5-sector logo); `design/g206.svg` is the previous source.
+
+## 2026-11-10 — HIG pass
+
+Decisions from a review against Apple's HIG, and what the experiments showed:
+- Reordering in Settings is back on `List.onMove` (native insertion line; the hand-drawn one landed in the wrong place on the user's Mac). Moving a service to another group, and Move Up/Down, are in each row's context menu.
+- Menu services list: 8.5 rows visible so the cut-off row shows it scrolls, and a legacy (always visible) scroller in the rows' right padding. Rows carry a VoiceOver label ("GitHub, All Systems Operational, 99.83% uptime over 30 days") and press action; the status item reads a sentence instead of an enum name. A third line shows the first incident (+N more) or the fetch error.
+- Arrow keys and Return in the list: not possible. A local event monitor gets no key events while a status menu tracks. Zero-height stand-in items per service did take the arrows, but the menu lays each out at 1 pt without counting it in its height (clipping the bottom or leaving a gap), shifts its content when one is highlighted, and won't send Return to an item that has a view. Reverted.
+- Delete confirmations: name in quotes, "This can’t be undone.", buttons named by outcome (Delete Group Only / Delete Group and Services), Cancel as the default button (Return cancels).
+- ⌘Q works in the Settings window (app menu in the hidden main menu); the window reopens where it was closed.
+- Localisation prep: percentages via `FormatStyle.percent`, intervals via `DateComponentsFormatter`, plurals via automatic grammar agreement; UI strings stay English.
+- Differentiate without color: `!`/`~` in the icon's hole, a centre dot on maintenance glyphs; normal appearance unchanged.
