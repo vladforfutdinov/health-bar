@@ -28,12 +28,6 @@ public enum Level: Int, Comparable, Sendable {
     }
 }
 
-/// "partial_outage" → "Partial outage".
-public func humanize(_ status: String) -> String {
-    let s = status.replacingOccurrences(of: "_", with: " ")
-    return s.prefix(1).uppercased() + s.dropFirst()
-}
-
 public struct Incident: Equatable, Sendable {
     public var name: String
     public var stage: String
@@ -42,21 +36,68 @@ public struct Incident: Equatable, Sendable {
     public var url: URL
 }
 
-/// One row of the second-level menu: a standalone component, or a group summarised by its worst child.
-public struct Item: Equatable, Sendable {
-    public var name: String
-    public var level: Level
-    public var status: String
-    /// Names of non-operational children; empty for standalone components.
-    public var affected: [String]
-}
-
-public struct ServiceStatus: Equatable, Sendable {
+/// The page-wide indicator from `/api/v2/status.json`.
+public struct PageStatus: Equatable, Sendable {
     public var level: Level
     public var description: String
+}
+
+/// Time one component spent in one non-operational status during a day.
+public struct Outage: Equatable, Sendable {
+    /// Display name, `Group · Component` when the component is in a group.
+    public var component: String
+    /// Component status as the platform names it, e.g. `major_outage`, `partial_outage`, `degraded_performance`.
+    public var status: String
+    public var seconds: TimeInterval
+
+    public var level: Level { Level(componentStatus: status) }
+}
+
+public struct UptimeDay: Equatable, Sendable {
+    /// Start of the day.
+    public var date: Date
+    /// Most severe first.
+    public var outages: [Outage]
+
+    public init(date: Date, outages: [Outage]) {
+        self.date = date
+        self.outages = outages.sorted { ($0.level, $0.seconds) > ($1.level, $1.seconds) }
+    }
+
+    public var level: Level { outages.first?.level ?? .ok }
+}
+
+/// Per-day history for the uptime strip.
+public struct Uptime: Equatable, Sendable {
+    /// Oldest first.
+    public var days: [UptimeDay]
+    /// Uptime of the worst component over the same days, 0–100.
+    public var percent: Double
+}
+
+/// What is read on the slow schedule: active incidents and the uptime strip.
+public struct ServiceDetails: Equatable, Sendable {
     public var pageURL: URL
     public var incidents: [Incident]
-    public var items: [Item]
+    /// `nil` when the history endpoint failed; the strip is then left out.
+    public var uptime: Uptime?
+}
+
+/// One service as the app last saw it.
+public struct ServiceState: Sendable {
+    public var status: Result<PageStatus, Error>?
+    /// Last successfully read level, kept through failed reads so a change is still detected.
+    public var known: Level?
+    public var details: ServiceDetails?
+    public var detailsAt: Date?
+
+    public init() {}
+}
+
+/// Details are read on a level change, then hourly while the page is fine and every 15 min while it is not.
+public func detailsDue(previous: Level?, current: Level, lastFetch: Date?, now: Date) -> Bool {
+    guard let previous, let lastFetch, previous == current else { return true }
+    return now.timeIntervalSince(lastFetch) >= (current == .ok ? 3600 : 900)
 }
 
 public enum IconState: Equatable, Sendable {
@@ -72,16 +113,4 @@ public enum IconState: Equatable, Sendable {
         case .ok, .maintenance: self = .ok
         }
     }
-}
-
-/// Builds a group row from its children.
-func groupItem(name: String, children: [(name: String, status: String)]) -> Item {
-    let rated = children.map { (name: $0.name, status: $0.status, level: Level(componentStatus: $0.status)) }
-    let worst = rated.max { $0.level < $1.level }
-    return Item(
-        name: name,
-        level: worst?.level ?? .ok,
-        status: worst?.status ?? "operational",
-        affected: rated.filter { $0.level != .ok }.map(\.name)
-    )
 }
