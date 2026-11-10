@@ -2,6 +2,8 @@
 
 macOS menu bar app showing the status of the services you depend on (GitHub, OpenAI, Claude, Vercel, Supabase by default).
 
+![HealthBar menu: each service with its status and a 30-day uptime strip](assets/screenshot.png)
+
 ## Install
 
 ```bash
