@@ -72,7 +72,7 @@ Optional `docs/release-notes/vX.Y.Z.md`, committed before the tag, is prepended 
 
 ## App icon
 
-The build copies `Resources/AppIcon.icns` into the bundle and sets `CFBundleIconFile`. The `.icns` is generated from `design/g206.svg`; after editing the SVG run `scripts/make-icon.sh` (needs Inkscape) and commit both.
+The build copies `Resources/AppIcon.icns` into the bundle and sets `CFBundleIconFile`. The `.icns` is generated from `design/g2.svg`; after editing the SVG run `scripts/make-icon.sh` (needs Inkscape) and commit both.
 
 ## Cutting a release
 
