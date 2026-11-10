@@ -64,3 +64,7 @@ The second menu level (groups and components) is gone; each service gets a 30-da
 Refresh (menu, wake, launch, config reload) clears every service to "updating…" and the icon to grey before polling, so what is shown after it is only what that refresh read; services fill in as they answer.
 - The Refresh item is a `RowView` that leaves the menu open, so the refill can be watched.
 - A service without data shows an empty grey strip, so rows keep their height; while services load the menu's right edge doesn't move in for the shorter "updating…" titles.
+
+## 2026-11-10 — build targets the declared minimum macOS
+
+`swiftc` ran without `-target`, so the binary's `minos` was the build machine's macOS (27.2 locally, the `macos-latest` runner's in CI) while `Info.plist` declared 13.0: v0.1.0 and v0.2.0 do not launch on older systems. `build.sh` now passes `-target <arch>-apple-macos<LSMinimumSystemVersion>`. Found when a local build would not run in the macOS 26 test VM.

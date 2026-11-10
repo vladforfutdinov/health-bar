@@ -75,7 +75,9 @@ else
 fi
 echo "version: $VERSION (short $SHORT, build $BUILD) — $DISPLAY_NAME [$BUNDLE_ID]"
 
-SWIFT_FLAGS=(-O -parse-as-library)
+# Without -target the binary's minimum OS is the build machine's, whatever Info.plist says.
+MIN_MACOS="$(plutil -extract LSMinimumSystemVersion raw macos/Info.plist)"
+SWIFT_FLAGS=(-O -parse-as-library -target "$(uname -m)-apple-macos$MIN_MACOS")
 [ "${HEALTHBAR_DEBUG:-0}" = "1" ] && SWIFT_FLAGS+=(-D DEBUG)
 LINK_FLAGS=(-framework Cocoa)
 
