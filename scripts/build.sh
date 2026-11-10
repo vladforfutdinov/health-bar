@@ -30,9 +30,10 @@ HEALTHBAR_SU_PUBLIC_KEY="${HEALTHBAR_SU_PUBLIC_KEY:-}"
 
 OUT="dist"
 if [ "$IS_RELEASE" = "1" ]; then
-    APP="$OUT/HealthBar.app";        BUNDLE_ID="$HEALTHBAR_BUNDLE_ID";     DISPLAY_NAME="$HEALTHBAR_DISPLAY_NAME"
+    APP="$OUT/HealthBar.app";        BUNDLE_ID="$HEALTHBAR_BUNDLE_ID";     DISPLAY_NAME="$HEALTHBAR_DISPLAY_NAME"; EXEC="HealthBar"
 else
-    APP="$OUT/HealthBar (dev).app";  BUNDLE_ID="$HEALTHBAR_BUNDLE_ID.dev"; DISPLAY_NAME="$HEALTHBAR_DISPLAY_NAME (dev)"
+    # Own process name: menu bar managers group items by it, so a dev copy would otherwise collide with an installed release.
+    APP="$OUT/HealthBar (dev).app";  BUNDLE_ID="$HEALTHBAR_BUNDLE_ID.debug"; DISPLAY_NAME="$HEALTHBAR_DISPLAY_NAME (dev)"; EXEC="HealthBarDev"
 fi
 
 mkdir -p "$OUT"
@@ -50,6 +51,7 @@ fi
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :HBVersionFull $VERSION" "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID" "$PLIST"
+/usr/libexec/PlistBuddy -c "Set :CFBundleExecutable $EXEC" "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleName $DISPLAY_NAME" "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName $DISPLAY_NAME" "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :HBRepoSlug $HEALTHBAR_REPO_SLUG" "$PLIST"
@@ -103,7 +105,7 @@ if [ "${WITH_SPARKLE:-0}" = "1" ]; then
                  -Xlinker -rpath -Xlinker @executable_path/../Frameworks)
 fi
 
-swiftc "${SWIFT_FLAGS[@]}" -o "$APP/Contents/MacOS/HealthBar" macos/main.swift Core/*.swift "${LINK_FLAGS[@]}"
+swiftc "${SWIFT_FLAGS[@]}" -o "$APP/Contents/MacOS/$EXEC" macos/main.swift Core/*.swift "${LINK_FLAGS[@]}"
 
 # Signing: SIGN_IDENTITY (Developer ID + Hardened Runtime + timestamp, required for notarization),
 # else ad-hoc. Hardened Runtime is Developer-ID-only: its library validation rejects an embedded

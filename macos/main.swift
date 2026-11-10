@@ -79,7 +79,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: self, userDriverDelegate: nil)
         #endif
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.autosaveName = "HealthBar"
+        // macOS keys the position by process name + autosaveName; the bundle id keeps dev and release builds apart.
+        statusItem.autosaveName = Bundle.main.bundleIdentifier ?? "HealthBar"
         setIcon(.unknown, label: "loading")
         loadConfig()
         NSWorkspace.shared.notificationCenter.addObserver(

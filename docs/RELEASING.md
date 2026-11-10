@@ -53,7 +53,7 @@ Settings, Secrets and variables, Actions, **Variables** (public values):
 
 | Variable | Value |
 |---|---|
-| `HEALTHBAR_BUNDLE_ID` | `com.vladforfutdinov.healthbar` (dev builds append `.dev`) |
+| `HEALTHBAR_BUNDLE_ID` | `com.vladforfutdinov.healthbar` (dev builds append `.debug`) |
 | `HEALTHBAR_DISPLAY_NAME` | `HealthBar` |
 | `HEALTHBAR_REPO_SLUG` | `vladforfutdinov/health-bar` (falls back to the building repo) |
 | `HEALTHBAR_FEED_URL` | `https://healthbar.forfutdinov.com/appcast.xml` |
