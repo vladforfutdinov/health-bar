@@ -5,8 +5,7 @@ macOS menu bar app showing the status of the services you depend on (GitHub, Ope
 ## Install
 
 ```bash
-brew tap vladforfutdinov/healthbar
-brew install --cask healthbar
+brew install --cask vladforfutdinov/healthbar/healthbar
 ```
 
 ## Icon
