@@ -45,3 +45,7 @@ scripts/build.sh && open "dist/HealthBar (dev).app"
 ```
 
 Releasing: `docs/RELEASING.md`.
+
+## License
+
+MIT, see `LICENSE`.
