@@ -271,7 +271,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.autosaveName = Bundle.main.bundleIdentifier ?? "HealthBar"
         menu.autoenablesItems = false
         menu.showsStateColumn = false
-        menu.delegate = self
         statusItem.menu = menu
         setIcon([], label: "loading")
         config = Config.load()
@@ -384,33 +383,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 percent: row.uptime.map { String(format: "%.2f %%", $0.percent) },
                 lead: 12 + NSAttributedString(string: "  ", attributes: [.font: NSFont.menuFont(ofSize: 0)]).size().width,
                 dayTips: row.uptime?.days.map(dayTip) ?? [], tip: tip,
-                rightEdge: RowView.textX + right, width: RowView.textX + right + 14)
+                rightEdge: RowView.textX + right, width: right + 2 * RowView.textX)
             menu.addItem(row.item)
         }
         if !config.services.isEmpty { menu.addItem(.separator()) }
 
         let updated = updatedAt.map { "Updated \(DateFormatter.localizedString(from: $0, dateStyle: .none, timeStyle: .short))" }
         menu.addItem(disabled(updated ?? "Updating…"))
-        let refresh = withShortcut(action("Refresh", #selector(refresh)), "r", rightEdge: right)
-        let refreshTitle = refresh.attributedTitle ?? NSAttributedString()
         // Stays open so the services can be watched refilling.
-        refresh.view = RowView(title: { $0 ? Self.whitened(refreshTitle) : refreshTitle }, days: nil,
-                               rightEdge: RowView.textX + right, width: RowView.textX + right + 14, closesMenu: false)
-        menu.addItem(refresh)
+        menu.addItem(row(action("Refresh", #selector(refresh)), key: "r", rightEdge: right, closesMenu: false))
         menu.addItem(.separator())
-        // Views: macOS 26 gives items titled "About …" and "Settings…" stock icons, which indent the rows.
-        let about = action("About HealthBar", #selector(openAbout))
-        let aboutTitle = NSAttributedString(string: about.title, attributes: [.font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.labelColor])
-        about.view = RowView(title: { $0 ? Self.whitened(aboutTitle) : aboutTitle }, days: nil,
-                             rightEdge: RowView.textX + right, width: RowView.textX + right + 14)
-        menu.addItem(about)
-        let settings = withShortcut(action("Settings…", #selector(openSettings)), ",", rightEdge: right)
-        let settingsTitle = settings.attributedTitle ?? NSAttributedString()
-        settings.view = RowView(title: { $0 ? Self.whitened(settingsTitle) : settingsTitle }, days: nil,
-                                rightEdge: RowView.textX + right, width: RowView.textX + right + 14)
-        menu.addItem(settings)
+        menu.addItem(row(action("About HealthBar", #selector(openAbout)), rightEdge: right))
+        menu.addItem(row(action("Settings…", #selector(openSettings)), key: ",", rightEdge: right))
         menu.addItem(.separator())
-        menu.addItem(withShortcut(action("Quit HealthBar", #selector(quit)), "q", rightEdge: right))
+        menu.addItem(row(action("Quit HealthBar", #selector(quit)), key: "q", rightEdge: right))
     }
 
     private static func whitened(_ title: NSAttributedString) -> NSAttributedString {
@@ -436,15 +422,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return item
     }
 
-    /// Shows `⌘<key>` as text; `menuHasKeyEquivalent` handles the key. A real key equivalent, even on a hidden
-    /// twin item, makes macOS reserve a shortcut column on every row.
-    private func withShortcut(_ item: NSMenuItem, _ key: String, rightEdge: CGFloat) -> NSMenuItem {
-        let hint = NSAttributedString(string: "⌘" + key.uppercased(), attributes: [
-            .font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.tertiaryLabelColor,
-        ])
+    /// Draws `item` as a `RowView` with `⌘<key>` right-aligned at `rightEdge`; the key itself is handled by a hidden
+    /// twin item. A visible key equivalent adds a shortcut column to every row, and macOS 26 adds stock icons to
+    /// standard items titled "About …", "Settings…" or "Quit …".
+    private func row(_ item: NSMenuItem, key: String? = nil, rightEdge: CGFloat, closesMenu: Bool = true) -> NSMenuItem {
         let font = NSFont.menuFont(ofSize: 0)
-        let title = item.attributedTitle ?? NSAttributedString(string: item.title, attributes: [.font: font, .foregroundColor: NSColor.labelColor])
-        item.attributedTitle = trailing(title, hint, rightEdge: rightEdge)
+        var title = NSAttributedString(string: item.title, attributes: [.font: font, .foregroundColor: NSColor.labelColor])
+        if let key {
+            // The key lives on a hidden, untitled twin: a menu doesn't send key equivalents to view items.
+            let twin = NSMenuItem(title: "", action: item.action, keyEquivalent: key)
+            twin.target = item.target
+            twin.isHidden = true
+            twin.allowsKeyEquivalentWhenHidden = true
+            menu.addItem(twin)
+            title = trailing(title, NSAttributedString(string: "⌘" + key.uppercased(), attributes: [
+                .font: font, .foregroundColor: NSColor.tertiaryLabelColor,
+            ]), rightEdge: rightEdge)
+        }
+        let line = title
+        item.view = RowView(title: { $0 ? Self.whitened(line) : line }, days: nil,
+                            rightEdge: RowView.textX + rightEdge, width: rightEdge + 2 * RowView.textX, closesMenu: closesMenu)
         return item
     }
 
@@ -576,24 +573,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.activate(ignoringOtherApps: true)
             window?.makeKeyAndOrderFront(nil)
         }
-    }
-}
-
-extension AppDelegate: NSMenuDelegate {
-    /// ⌘R, ⌘, and ⌘Q while the menu is open, without items carrying key equivalents (see `withShortcut`).
-    nonisolated func menuHasKeyEquivalent(_ menu: NSMenu, for event: NSEvent, target: AutoreleasingUnsafeMutablePointer<AnyObject?>,
-                                          action: UnsafeMutablePointer<Selector?>) -> Bool {
-        guard event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command else { return false }
-        let selector: Selector
-        switch event.charactersIgnoringModifiers {
-        case "r": selector = #selector(refresh)
-        case ",": selector = #selector(openSettings)
-        case "q": selector = #selector(quit)
-        default: return false
-        }
-        target.pointee = self
-        action.pointee = selector
-        return true
     }
 }
 
