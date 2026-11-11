@@ -138,26 +138,27 @@ enum Glyph {
 
     /// Uptime strip: one bar per day, oldest on the left, on a panel of the menu's background colour
     /// so the gaps and frame stay put under the selection highlight. Bars use the icon's colours.
-    static let stripBar: CGFloat = 3, stripGap: CGFloat = 1.5, stripFrame: CGFloat = 2
+    static let stripBar: CGFloat = 3, stripGap: CGFloat = 1.5, stripFrame: CGFloat = 2, stripHeight: CGFloat = 14
 
+    static func stripSize(count: Int, bar: CGFloat) -> NSSize {
+        NSSize(width: CGFloat(count) * (bar + stripGap) - stripGap + 2 * stripFrame, height: stripHeight + 2 * stripFrame)
+    }
+
+    /// Draws the strip into the current context, so its colours resolve in the drawing view's appearance;
+    /// an `NSImage` drawing handler ran later and cached, and rows scrolled into a dark menu came out light.
     /// - Parameters:
     ///   - days: `nil` days draw as empty grey bars, the placeholder while nothing is loaded.
     ///   - bar: bar width; `RowView` widens bars so the strip fills its row.
-    static func strip(_ days: [Level?], bar: CGFloat = stripBar, height: CGFloat = 14) -> NSImage {
-        let gap = stripGap, frame = stripFrame
-        let panel = NSRect(x: 0, y: 0, width: CGFloat(days.count) * (bar + gap) - gap + 2 * frame, height: height + 2 * frame)
-        let image = NSImage(size: NSSize(width: panel.maxX, height: panel.height), flipped: false) { _ in
-            NSColor.windowBackgroundColor.setFill()
-            NSBezierPath(roundedRect: panel, xRadius: 2.5, yRadius: 2.5).fill()
-            for (i, level) in days.enumerated() {
-                let r = NSRect(x: panel.minX + frame + CGFloat(i) * (bar + gap), y: frame, width: bar, height: height)
-                color(level).setFill()
-                NSBezierPath(roundedRect: r, xRadius: 0.75, yRadius: 0.75).fill()
-            }
-            return true
+    ///   - alpha: bar opacity, for the faint strip under "No uptime history".
+    static func drawStrip(_ days: [Level?], at origin: NSPoint, bar: CGFloat, alpha: CGFloat = 1) {
+        let panel = NSRect(origin: origin, size: stripSize(count: days.count, bar: bar))
+        NSColor.windowBackgroundColor.withAlphaComponent(alpha).setFill()
+        NSBezierPath(roundedRect: panel, xRadius: 2.5, yRadius: 2.5).fill()
+        for (i, level) in days.enumerated() {
+            let r = NSRect(x: panel.minX + stripFrame + CGFloat(i) * (bar + stripGap), y: panel.minY + stripFrame, width: bar, height: stripHeight)
+            color(level).withAlphaComponent(alpha).setFill()
+            NSBezierPath(roundedRect: r, xRadius: 0.75, yRadius: 0.75).fill()
         }
-        image.isTemplate = false
-        return image
     }
 }
 
@@ -173,7 +174,9 @@ final class RowView: NSView, NSViewToolTipOwner {
     private static let percentGap: CGFloat = 8
 
     private let title: (_ highlighted: Bool) -> NSAttributedString
-    private let strip: NSImage?
+    private let days: [Level?]?
+    private let bar: CGFloat
+    private let stripSize: NSSize?
     private let percent: String?
     private let stripX: CGFloat
     private let rightEdge: CGFloat
@@ -216,12 +219,15 @@ final class RowView: NSView, NSViewToolTipOwner {
         let widest = ceil(NSAttributedString(string: Self.percentText(100), attributes: [.font: Self.percentFont]).size().width)
         let span = rightEdge - widest - Self.percentGap - stripX - 2 * Glyph.stripFrame + Glyph.stripGap
         let bar = days.map { max(Glyph.stripBar, span / CGFloat(max($0.count, 1)) - Glyph.stripGap) } ?? Glyph.stripBar
-        strip = days.map { Glyph.strip($0, bar: bar) }
+        self.days = days
+        self.bar = bar
+        let strip = days.map { Glyph.stripSize(count: $0.count, bar: bar) }
+        stripSize = strip
         let line = ceil(title(false).size().height)
         top = strip == nil ? 3 : 4
         let noteHeight = note == nil ? 0 : 2 + ceil(Self.noteFont.ascender - Self.noteFont.descender + Self.noteFont.leading)
-        let height = top + line + (strip.map { Self.gap + $0.size.height + noteHeight + 5 } ?? 3)
-        peekHeight = top + line + Self.gap + (strip.map { $0.size.height * 0.4 } ?? 0)
+        let height = top + line + (strip.map { Self.gap + $0.height + noteHeight + 5 } ?? 3)
+        peekHeight = top + line + Self.gap + (strip.map { $0.height * 0.4 } ?? 0)
         super.init(frame: NSRect(x: 0, y: 0, width: width, height: height))
         autoresizingMask = [.width]
         setAccessibilityElement(true)
@@ -234,9 +240,9 @@ final class RowView: NSView, NSViewToolTipOwner {
         if let strip {
             for (i, text) in dayTips.enumerated() {
                 let x = stripX + Glyph.stripFrame + CGFloat(i) * (bar + Glyph.stripGap) - Glyph.stripGap / 2
-                addTip(NSRect(x: x, y: stripY, width: bar + Glyph.stripGap, height: strip.size.height), text)
+                addTip(NSRect(x: x, y: stripY, width: bar + Glyph.stripGap, height: strip.height), text)
             }
-            addTip(NSRect(x: stripX + strip.size.width, y: stripY, width: width, height: height - stripY), tip)
+            addTip(NSRect(x: stripX + strip.width, y: stripY, width: width, height: height - stripY), tip)
         }
     }
 
@@ -268,24 +274,23 @@ final class RowView: NSView, NSViewToolTipOwner {
         }
         let line = title(highlighted)
         line.draw(at: NSPoint(x: Self.textX, y: top))
-        guard let strip else { return }
+        guard let days, let strip = stripSize else { return }
         let y = top + ceil(line.size().height) + Self.gap
         let secondary = highlighted ? NSColor.selectedMenuItemTextColor : NSColor.secondaryLabelColor
-        strip.draw(in: NSRect(origin: NSPoint(x: stripX, y: y), size: strip.size), from: .zero, operation: .sourceOver,
-                   fraction: stripText == nil ? 1 : 0.25, respectFlipped: true, hints: nil)
+        Glyph.drawStrip(days, at: NSPoint(x: stripX, y: y), bar: bar, alpha: stripText == nil ? 1 : 0.25)
         if let stripText {
             let text = NSAttributedString(string: stripText, attributes: [.font: Self.noteFont, .foregroundColor: secondary])
-            text.draw(at: NSPoint(x: stripX + 6, y: y + (strip.size.height - text.size().height) / 2))
+            text.draw(at: NSPoint(x: stripX + 6, y: y + (strip.height - text.size().height) / 2))
         }
         if let note {
             let style = NSMutableParagraphStyle()
             style.lineBreakMode = .byTruncatingTail
             NSAttributedString(string: note, attributes: [.font: Self.noteFont, .foregroundColor: secondary, .paragraphStyle: style])
-                .draw(in: NSRect(x: stripX, y: y + strip.size.height + 2, width: rightEdge - stripX, height: bounds.height - y - strip.size.height))
+                .draw(in: NSRect(x: stripX, y: y + strip.height + 2, width: rightEdge - stripX, height: bounds.height - y - strip.height))
         }
         guard let percent else { return }
         let text = NSAttributedString(string: percent, attributes: [.font: Self.percentFont, .foregroundColor: secondary])
-        text.draw(at: NSPoint(x: rightEdge - text.size().width, y: y + (strip.size.height - text.size().height) / 2))
+        text.draw(at: NSPoint(x: rightEdge - text.size().width, y: y + (strip.height - text.size().height) / 2))
     }
 
     override func accessibilityPerformPress() -> Bool {
@@ -358,9 +363,13 @@ final class ServiceListView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    /// Visible rows repaint on every scroll step: pieces copied from earlier frames came out in a lighter shade
+    /// in a dark menu (macOS 27) until a full redraw.
     @objc private func scrolled() {
         onScroll?(scrollView.contentView.bounds.origin.y)
         updateHover()
+        let visible = scrollView.contentView.bounds
+        for row in rows where row.frame.intersects(visible) { row.needsDisplay = true }
     }
 
     override func mouseMoved(with event: NSEvent) { updateHover() }
@@ -383,6 +392,9 @@ final class ServiceListView: NSView {
 /// Top-left origin, so rows stack downwards from the top of a scroll view.
 final class FlippedView: NSView {
     override var isFlipped: Bool { true }
+    /// Responsive scrolling pre-renders rows beyond the visible edge, and in a dark menu on macOS 27 that
+    /// content came out in the light palette until redrawn.
+    override class var isCompatibleWithResponsiveScrolling: Bool { false }
 }
 
 @MainActor
