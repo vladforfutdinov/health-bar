@@ -3,22 +3,19 @@
     <channel>
         <title>HealthBar</title>
         <item>
-            <title>0.3.4</title>
-            <pubDate>Wed, 11 Nov 2026 21:43:14 +0000</pubDate>
-            <sparkle:version>33</sparkle:version>
-            <sparkle:shortVersionString>0.3.4</sparkle:shortVersionString>
+            <title>0.3.5</title>
+            <pubDate>Wed, 11 Nov 2026 23:11:19 +0000</pubDate>
+            <sparkle:version>34</sparkle:version>
+            <sparkle:shortVersionString>0.3.5</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description><![CDATA[<h2>Changes</h2>
+            <description><![CDATA[<h2>Accessibility</h2>
 <ul>
-<li><strong>Check for Updates…</strong> moved back to the menu; the Version / Check Now row left Settings (the version is in About).</li>
-<li>After waking from sleep, checks wait for the network instead of marking every service unreachable.</li>
-<li>The menu bar icon's tooltip counts unreachable services as problems and says "No services" when the list is empty.</li>
-<li>Import drops repeated status page addresses.</li>
-<li>A stored configuration that cannot be read is kept aside instead of being overwritten.</li>
-<li>Less work while the menu is closed: it is rebuilt only when opened, and checks run per service.</li>
+<li><strong>Keyboard and VoiceOver reach every service in the menu.</strong> The arrow keys move through the services one by one; the selected row lights up and scrolls into view. Return opens its status page.</li>
+<li><strong>VoiceOver</strong> reads each service — name, status, uptime or the current incident — and a summary on the list, such as "1 of 15 services with problems: Snyk". VO-Space opens the page.</li>
+<li>Refresh, About, Check for Updates…, Settings… and Quit are read by name and now respond to Return and VO-Space.</li>
 </ul>]]></description>
-            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.3.4/HealthBar.zip" length="1632665" type="application/octet-stream" sparkle:edSignature="iRtfrnOSZiAmp3Q9CvjQZyjfe3PJ+oqMEIN+63rT2ThZKYKfq1X3eHVML+CXFHbat0sCG2sT65wQ/eY6LBjJCQ=="/>
+            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.3.5/HealthBar.zip" length="1635542" type="application/octet-stream" sparkle:edSignature="NAd0iDd99zxGcCOlgTJPy0mEoUFyInoNYd5wJUGjSLIGqEALvuSdAMn2cBLb9BeFbDSGpk21gSKCBiuOL3iLBQ=="/>
         </item>
     </channel>
 </rss>
