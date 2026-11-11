@@ -22,7 +22,16 @@ public actor StatusFetcher {
     private let session: URLSession
     private var platforms: [URL: Platform] = [:]
 
-    public init(session: URLSession = .shared) {
+    /// Caps a whole response at 30 s (the per-request timeout only counts idle time, so a page trickling bytes could
+    /// hold a poll indefinitely), and within that waits for the network: right after wake Wi-Fi takes a few seconds.
+    public static let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForResource = 30
+        config.waitsForConnectivity = true
+        return URLSession(configuration: config)
+    }()
+
+    public init(session: URLSession = StatusFetcher.session) {
         self.session = session
     }
 
@@ -42,7 +51,17 @@ public actor StatusFetcher {
     }
 
     public func status(_ base: URL) async throws -> PageStatus {
-        try decodeStatuspage(await get(base.appendingPathComponent("api/v2/status.json"))).pageStatus
+        try await statusJSON(base).pageStatus
+    }
+
+    /// Checks that `base` serves a status page and returns the page's own name, if it has one.
+    /// - Throws: network errors, `FetchError.http`, or `DecodingError` when it is not a status page.
+    public func pageName(_ base: URL) async throws -> String? {
+        try await statusJSON(base).page.name
+    }
+
+    private func statusJSON(_ base: URL) async throws -> StatuspageSummary {
+        try decodeStatuspage(await get(base.appendingPathComponent("api/v2/status.json")))
     }
 
     /// Incidents from `summary.json` plus the uptime strip; a failed strip leaves `uptime` nil.
@@ -75,6 +94,13 @@ public actor StatusFetcher {
             batches.append(try decodeShowcase(data))
         }
         return showcaseUptime(batches, days: Self.historyDays, names: summary.componentNames)
+    }
+
+    /// Whether `base` looks like a status page: a HEAD of its `status.json` answers 200. Cheap enough to run while typing.
+    public func answers(_ base: URL) async -> Bool {
+        var req = URLRequest(url: base.appendingPathComponent("api/v2/status.json"), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+        req.httpMethod = "HEAD"
+        return ((try? await session.data(for: req))?.1 as? HTTPURLResponse)?.statusCode == 200
     }
 
     private func get(_ url: URL, query: [String: String] = [:]) async throws -> Data {

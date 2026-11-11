@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="13.030258"
+   height="13.030708"
+   viewBox="0 0 13.030258 13.030708"
+   version="1.1"
+   id="svg4"
+   sodipodi:docname="status-icons.svg"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs4" />
+  <sodipodi:namedview
+     id="namedview4"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showguides="true"
+     inkscape:zoom="9.3061364"
+     inkscape:cx="49.161111"
+     inkscape:cy="32.774074"
+     inkscape:window-width="1581"
+     inkscape:window-height="1381"
+     inkscape:window-x="0"
+     inkscape:window-y="31"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="svg4"
+     showgrid="false">
+    <inkscape:page
+       x="0"
+       y="0"
+       width="13.030258"
+       height="13.030708"
+       id="page2"
+       margin="0"
+       bleed="0" />
+  </sodipodi:namedview>
+  <g
+     id="g2"
+     style="stroke-width:0.03;stroke-dasharray:none;paint-order:markers fill stroke"
+     inkscape:export-filename="g2.png"
+     inkscape:export-xdpi="96"
+     inkscape:export-ydpi="96"
+     transform="translate(-89.484933,-25.484727)">
+    <path
+       id="logo5-ok"
+       style="fill:#34c759;stroke:#ffffff;stroke-width:0.03;stroke-dasharray:none;paint-order:markers fill stroke"
+       d="m 90.370841,35.249989 a 6.5,6.5 0 0 1 0.798716,-7.599382 l 1.932165,1.739808 a 3.9,3.9 0 0 0 -0.479215,4.559574 z" />
+    <path
+       id="logo5-degraded"
+       style="fill:#ff9500;stroke:#ffffff;stroke-width:0.03;stroke-dasharray:none;paint-order:markers fill stroke"
+       d="m 91.169557,27.650607 a 6.5,6.5 0 0 1 7.47423,-1.588654 l -1.057498,2.37516 a 3.9,3.9 0 0 0 -4.484567,0.953302 z" />
+    <path
+       id="logo5-outage"
+       style="fill:#ff3b30;stroke:#ffffff;stroke-width:0.03;stroke-dasharray:none;paint-order:markers fill stroke"
+       d="m 98.643787,26.061953 a 6.5,6.5 0 0 1 3.820603,6.617473 l -2.585701,-0.27176 a 3.9,3.9 0 0 0 -2.2924,-3.970553 z" />
+    <path
+       id="logo5-maintenance"
+       style="fill:#007aff;stroke:#ffffff;stroke-width:0.03;stroke-dasharray:none;paint-order:markers fill stroke"
+       d="m 102.46439,32.679426 a 6.5,6.5 0 0 1 -5.112933,5.678546 l -0.540635,-2.543208 a 3.9,3.9 0 0 0 3.067867,-3.407098 z" />
+    <path
+       id="logo5-unknown"
+       style="fill:#8e8e93;stroke:#ffffff;stroke-width:0.03;stroke-dasharray:none;paint-order:markers fill stroke"
+       d="m 97.351457,38.357972 a 6.5,6.5 0 0 1 -6.980616,-3.107983 l 2.251666,-1.3 a 3.9,3.9 0 0 0 4.188315,1.864775 z" />
+  </g>
+  <g
+     id="g1"
+     transform="translate(-89.484933,-25.484727)">
+    <path
+       style="fill:#34c759;stroke:#34c759;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:0;stroke-dasharray:none;stroke-dashoffset:0;paint-order:fill markers stroke;stop-color:#000000"
+       d="m 98.076111,29.834961 v 4.330078 a 3,3 0 0 0 0.462891,-0.566406 v -3.197266 a 3,3 0 0 0 -0.462891,-0.566406 z"
+       id="logo5-path249" />
+    <path
+       style="fill:#ff3b30;stroke:#ff3b30;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:0;stroke-dasharray:none;stroke-dashoffset:0;paint-order:fill markers stroke;stop-color:#000000"
+       d="m 93.923768,29.834961 a 3,3 0 0 0 -0.462891,0.566406 v 3.197266 a 3,3 0 0 0 0.462891,0.566406 z"
+       id="logo5-path248" />
+    <path
+       style="fill:#ff9500;stroke:#ff9500;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:0;stroke-dasharray:none;stroke-dashoffset:0;paint-order:fill markers stroke;stop-color:#000000"
+       d="m 97.154236,29.231446 v 5.539062 a 3,3 0 0 0 0.460938,-0.242188 v -5.054687 a 3,3 0 0 0 -0.460938,-0.242187 z"
+       id="logo5-path247" />
+    <path
+       style="fill:#8e8e93;stroke:#8e8e93;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:0;stroke-dasharray:none;stroke-dashoffset:0;paint-order:fill markers stroke;stop-color:#000000"
+       d="m 94.845642,29.231446 a 3,3 0 0 0 -0.460937,0.242187 v 5.054687 a 3,3 0 0 0 0.460937,0.242188 z"
+       id="logo5-path246" />
+    <path
+       style="fill:#34c759;stroke:#34c759;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:0;stroke-dasharray:none;stroke-dashoffset:0;paint-order:fill markers stroke;stop-color:#000000"
+       d="m 96.230408,29.008789 v 5.982422 a 3,3 0 0 0 0.462891,-0.07227 V 29.08105 a 3,3 0 0 0 -0.462891,-0.07227 z"
+       id="logo5-path245" />
+    <path
+       style="fill:#34c759;stroke:#34c759;stroke-width:0.2;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:0;stroke-dasharray:none;stroke-dashoffset:0;paint-order:fill markers stroke;stop-color:#000000"
+       d="m 95.769471,29.008789 a 3,3 0 0 0 -0.460938,0.07227 v 5.837891 a 3,3 0 0 0 0.460938,0.07227 z"
+       id="logo5-circle206" />
+  </g>
+</svg>

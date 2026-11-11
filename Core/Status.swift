@@ -30,10 +30,8 @@ public enum Level: Int, Comparable, Sendable {
 
 public struct Incident: Equatable, Sendable {
     public var name: String
+    /// `investigating`, `identified`, `monitoring`, `in_progress`…
     public var stage: String
-    public var level: Level
-    public var lastUpdate: String?
-    public var url: URL
 }
 
 /// The page-wide indicator from `/api/v2/status.json`.
@@ -94,23 +92,23 @@ public struct ServiceState: Sendable {
     public init() {}
 }
 
-/// Details are read on a level change, then hourly while the page is fine and every 15 min while it is not.
+/// Details are read hourly, and at once when the level changes.
 public func detailsDue(previous: Level?, current: Level, lastFetch: Date?, now: Date) -> Bool {
     guard let previous, let lastFetch, previous == current else { return true }
-    return now.timeIntervalSince(lastFetch) >= (current == .ok ? 3600 : 900)
+    return now.timeIntervalSince(lastFetch) >= 3600
 }
 
-public enum IconState: Equatable, Sendable {
-    case ok, degraded, outage, unknown
-
-    /// Maintenance and failed fetches don't colour the icon; it goes grey only when nothing loaded.
-    public init(levels: [Level?]) {
-        let loaded = levels.compactMap { $0 }
-        if loaded.isEmpty { self = .unknown; return }
-        switch loaded.max()! {
-        case .outage: self = .outage
-        case .degraded: self = .degraded
-        case .ok, .maintenance: self = .ok
-        }
+/// Sectors of the bar icon, clockwise from 12 o'clock. Up to `limit` services: one sector each, in order.
+/// Beyond that, `limit` sectors: each status other than OK takes a share proportional to how many services have it
+/// (at least one sector when any do), worst first; OK fills the rest. `nil` is not loaded or unreachable.
+public func iconSectors(_ levels: [Level?], limit: Int = 10) -> [Level?] {
+    guard levels.count > limit else { return levels }
+    var sectors: [Level?] = []
+    for kind in [Level.outage, .degraded, .maintenance, nil] as [Level?] {
+        let count = levels.filter { $0 == kind }.count
+        guard count > 0 else { continue }
+        let share = max(1, Int((Double(count) / Double(levels.count) * Double(limit)).rounded()))
+        sectors += Array(repeating: kind, count: min(share, limit - sectors.count))
     }
+    return sectors + Array(repeating: .ok, count: limit - sectors.count)
 }

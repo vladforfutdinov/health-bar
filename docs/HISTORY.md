@@ -68,3 +68,82 @@ Refresh (menu, wake, launch, config reload) clears every service to "updating…
 ## 2026-11-10 — build targets the declared minimum macOS
 
 `swiftc` ran without `-target`, so the binary's `minos` was the build machine's macOS (27.2 locally, the `macos-latest` runner's in CI) while `Info.plist` declared 13.0: v0.1.0 and v0.2.0 do not launch on older systems. `build.sh` now passes `-target <arch>-apple-macos<LSMinimumSystemVersion>`. Found when a local build would not run in the macOS 26 test VM.
+
+## 2026-11-10 — Settings window replaces the config file
+
+- Services, poll interval, Launch at Login and Sparkle's update options moved into a Settings window (menu → Settings… ⌘,); Edit Config…, Reload Config, Launch at Login and Check for Updates… left the menu. Changes apply at once, no Save.
+- Storage moved from `services.json` to `UserDefaults` (key `config`, the same JSON). The file is imported once when nothing is stored, then left in place and ignored. Watching the file for edits was considered and dropped with it.
+- A new address is accepted only if its `status.json` decodes; the page's own name is the default service name. 404 or a non-status page reads as "not a Statuspage or incident.io status page".
+- The poll interval is a fixed list (30 s – 15 min); an imported value snaps to the nearest, ties to the longer.
+- Reordering or adding services keeps the data of those already loaded; only new ones are read in full.
+- SwiftUI `Form` in an `NSWindow`. An accessory app shows no menu bar, but `NSApp.mainMenu` gets Edit and Close items so copy/paste and ⌘W work in the window.
+- macOS 26 puts a stock gear icon on an item titled "Settings…", indenting it; the item is a `RowView` like Refresh.
+- Services became a grouped catalog (`Core/Catalog.swift`, from a survey of pages serving `/api/v2/summary.json` on 2026-11-10) with an enabled flag per page; the original five are enabled by default. Pages added by address go to a Custom group, the only removable ones. Groups fold (Fold all / Unfold all) and are reordered by drag; per-service drag and renaming were dropped. The menu shows enabled services in group order.
+- A stored config gains catalog pages it lacks, disabled, on load, so the list can grow in updates. A 0.2.x `services.json` import enables exactly its pages; ones outside the catalog go to Custom.
+- Settings iteration (same day): services can sit outside any group (`Config.ungrouped`, listed and shown first); adding and editing a service is a sheet (address, name, group), as is naming a group (New Group…, pencil to rename); New Group… / New Service… sit under the list. Any address can be edited; a changed catalog address leaves the catalog page to be re-added unchecked on the next launch. The address is checked by a HEAD of `status.json` when the field loses focus (green check on 200), then by a GET on save, which also supplies the page's name. Removing a service or group asks first; a group's services can be kept (moved out of the group). Per-service and per-group drag use `draggable` / `onDrop` with a hand-drawn insertion line, since `List.onMove` reorders only within one `ForEach`; the line is drawn only between a drag entering a row and the drop, because macOS 26 sends `dropUpdated` again after `performDrop`. The services list is its own `List` above the `Form`: a `List` inside a `Form` is clipped, not scrolled. Per-group "N of M" counters were dropped.
+- Settings follow-up: editing (pencil, after the address) and deleting (inside the edit sheet, confirmed) for services and all groups, catalog ones included; a deleted catalog page is remembered in `Config.removed` so it isn't re-added. Drag handle is a drawn 2×3-dot grip at the row's end (no SF Symbol has six dots). Settings closes on Escape, caught in the window's `sendEvent` because the list consumes it. About HealthBar opens the standard About panel with credits.
+- Keyboard focus: opened from the status menu, the Settings window got no key events (Escape, typing) until clicked, though AppKit reported the app active and the window key. `activate(ignoringOtherApps: true)` run after the menu has closed fixes it; the same call during menu teardown, `NSApp.activate()`, and a non-activating `NSPanel` did not (checked with a key-event log in the VM).
+- Menu width and shortcuts: once a hidden twin titled "Settings…" was added, macOS reserved the shortcut column again (a blank band on the right), apparently because of the stock icon macOS 26 gives that title. `NSMenuDelegate.menuHasKeyEquivalent` and key equivalents on the view items themselves were tried and never fire while the menu is open (checked with ⌘Q in the VM, against a standard item where it does). Twins stay, untitled; Refresh, About, Settings and Quit are `RowView`s; right padding equals the left.
+- About icon: macOS 26 draws a legacy `.icns` app icon shrunk inside a grey rounded-square frame, which read blurry in the About panel. The panel gets the bundle's `AppIcon.icns` image directly (`.applicationIcon`). Finder and the Dock still show the framed icon; that needs an Icon Composer `.icon` asset.
+
+## 2026-11-10 — many services
+
+- With the catalog, the menu outgrew the screen. The services are one menu item holding a scroll view of `RowView`s, 8 visible; the scroll position survives the refills while data arrives. The list owns the hover highlight (rows scrolling under a still pointer get no enter/exit events) and the clicks.
+- The bar icon keeps one sector per service up to 10; beyond that 10 sectors, each problem status getting a share proportional to its count (at least one), worst first (`iconSectors`).
+- Checking a service in Settings saves at once; its data is fetched in the background (checked in the VM: the box flips within 0.15 s).
+- `design/status-icons.svg` has a 5-sector logo variant (`logo5`) in all status colours, for further design.
+
+## 2026-11-10 — concurrency review fixes
+
+- Settings save awaits the page (up to the timeout); Cancel and Delete… in the service sheet were live meanwhile, so a cancelled add still landed, a deleted service came back under its new address, and two adds of one address both passed the duplicate check. Cancel and Delete… are disabled while saving, and `save` re-checks the address and the edited service after the await.
+- `StatusFetcher` uses a session with `timeoutIntervalForResource = 30`: the request timeout counts only idle time, and one trickling page kept `pending > 0`, which skips every timer poll.
+- Reviewed and left: results applied via `RunLoop.main.perform` were suspected of waiting for the next event with the menu closed; not seen in the VM (the icon filled in sector by sector with no input). A Statuspage host answering 200 with HTML on incident.io's `component_impacts` path would be cached as incident.io; not observed.
+- App icon now comes from `design/g2.svg` (the 5-sector logo); `design/g206.svg` is the previous source.
+
+## 2026-11-10 — HIG pass
+
+Decisions from a review against Apple's HIG, and what the experiments showed:
+- Reordering in Settings is back on `List.onMove` (native insertion line; the hand-drawn one landed in the wrong place on the user's Mac). Moving a service to another group, and Move Up/Down, are in each row's context menu.
+- Menu services list: 8.5 rows visible so the cut-off row shows it scrolls, and a legacy (always visible) scroller in the rows' right padding. Rows carry a VoiceOver label ("GitHub, All Systems Operational, 99.83% uptime over 30 days") and press action; the status item reads a sentence instead of an enum name. A third line shows the first incident (+N more) or the fetch error.
+- Arrow keys and Return in the list: not possible. A local event monitor gets no key events while a status menu tracks. Zero-height stand-in items per service did take the arrows, but the menu lays each out at 1 pt without counting it in its height (clipping the bottom or leaving a gap), shifts its content when one is highlighted, and won't send Return to an item that has a view. Reverted.
+- Delete confirmations: name in quotes, "This can’t be undone.", buttons named by outcome (Delete Group Only / Delete Group and Services), Cancel as the default button (Return cancels).
+- ⌘Q works in the Settings window (app menu in the hidden main menu); the window reopens where it was closed.
+- Localisation prep: percentages via `FormatStyle.percent`, intervals via `DateComponentsFormatter`, plurals via automatic grammar agreement; UI strings stay English.
+- Differentiate without color: `!`/`~` in the icon's hole, a centre dot on maintenance glyphs; normal appearance unchanged.
+- Confirmations are a small sheet (`ConfirmSheet`) styled like the other sheets: SwiftUI's `.alert` on macOS 26 used large capsule buttons unlike the rest, and Escape didn't dismiss it (the window's Escape handler checks `attachedSheet`, which the alert isn't). Cancel is the default button; Return and Escape cancel.
+- The Settings list has a selection (Tab reaches it; arrows move): Space checks a service or folds a group, Return edits, Delete deletes (confirmed), ⌥⌘↑/↓ move. Hidden buttons with key equivalents, enabled only while the list has focus, since `onKeyPress` needs macOS 14.
+- Of the 59 catalog pages, 15 give no per-day history (checked 2026-11-10): Statuspage pages with uptime display off answer `uptime_showcase` with no timelines (Snyk, Deepgram, DigitalOcean, Linode, MongoDB, Grafana, New Relic, Mailgun, Jira, Figma, Zoom, Dropbox), Cloudflare's answers 404, Mistral's and Replit's `component_impacts` 403. Their rows say "No uptime history" in the strip's place, so a grey strip means only "loading".
+- The menu list's scroller took width from its clip view while the content kept the full width, so it scrolled sideways; the content now matches the clip width.
+- After 0.3.0: the menu list uses the standard overlay scroller (appears while scrolling) instead of an always-visible one, and the cut-off row shows its title and the top edge of its strip. "No uptime history" sits over a 25%-opacity placeholder strip.
+
+## 2026-11-11 — simpler history schedule
+
+Details (incidents and the strip) are read hourly and at once on a status change; the 15-minute schedule while a page is not operational is gone. Status changes already trigger a read, so the extra polls mostly re-read an unchanged incident list.
+
+## 2026-11-11 — Settings polish
+
+- The window can only be made taller (the list grows): width is fixed and the default height (570 pt of content) is the least. Limits come from the SwiftUI frame via `sizingOptions = [.minSize, .maxSize]`; `contentMaxSize` alone left the width free. Zoom is disabled, and a restored frame is clamped. It remembers which groups are folded (`settingsExpandedGroups`).
+- Focus starts in the list, not on the Expand All link (`defaultFocus` plus a deferred set: on macOS 27 the window picked the link as first responder after `onAppear`).
+- The footer hint moved into an ⓘ next to "Services", as a tooltip, the way reLayout puts hints on ⓘ.
+- Import… / Export… read and write the whole config as JSON (`Config.importing` also takes a 0.2.x `services.json`); import replaces after a confirmation.
+- `docs/SERVICES.md` lists the catalog with platform, default and whether each page publishes history; regenerate with `scripts/services-doc.py`.
+- A band across the strips of rows scrolled into view in the dark menu (macOS 27, Retina; not reproduced in the macOS 26 VM): the part drawn while the row peeked out had dark-theme colours, the rest looked like the light palette. The band showed only while scrolling and went away when the rows were redrawn after it (`didEndLiveScroll`), so it is responsive scrolling's pre-rendered overdraw; opting the list out of responsive scrolling, or drawing inside `performAsCurrentDrawingAppearance`, did not help. The strip was an `NSImage` with a drawing handler, which AppKit runs later and caches outside the view's appearance; it is now drawn directly in `RowView.draw`, which did not help either. What works is a full redraw: visible rows repaint on every scroll step (confirmed on the user's Mac). Likely a macOS 27 compositing bug; the responsive-scrolling opt-out and direct strip drawing stay, harmless, though not shown to be needed.
+
+## 2026-11-11 — audit fixes
+
+From a whole-repo review:
+- Polling is keyed by URL: each request has an id, a timer poll skips only services still in flight, and a config change reads only new services (previously a checkbox re-read all, and one slow page held every timer poll).
+- The menu is rebuilt only while open, or when it opens after a change (`menuNeedsUpdate`); closed, a result only redraws the icon. Day tooltips are built on hover with shared formatters, instead of ~30 per row on every refill.
+- The session waits for connectivity (within the 30 s cap): after wake every service used to fail at once and stay "unreachable" until the next poll.
+- The icon's summary counts unreachable services as problems.
+- A stored config that can't be decoded (e.g. after a downgrade) is kept under `config.unreadable` before the default replaces it. Import drops repeated addresses.
+- Removed: `IconState`, `Config.move(_:to:after:)`, `move(_:intoGroup:)`, `moveGroup`, `ServiceGroup.isCustom`, unused incident fields, the `NSMenuItem` used only as a title holder, the two `SettingsModel` inits. Version / Check Now left Settings; Check for Updates… is a menu item again.
+
+## 2026-11-11 — keyboard and VoiceOver in the menu
+
+Checked with VoiceOver in the macOS VM (v0.3.4): the icon and Settings read well, but the services were out of reach. Arrow keys and VoiceOver move between menu items only, and the scrolling list is one item, announced as an unnamed "scroll area"; VO-Shift-Down did not step into it.
+- The list item's title is the icon's summary ("1 of 15 services with problems: Snyk"), read when VoiceOver reaches it. The item is disabled: enabled, Up from the first service moved onto it with the first row still lit, so Down took two presses to reach the second. The arrow keys skip a disabled item; VoiceOver still stops there (with no row lit), and the view still gets the mouse.
+- Each service gets a stand-in item after the list: a 0.1 pt view and its spoken text as a 0.1 pt title (a full-size title widened the menu). The menu walks them; highlighting one lights its row and scrolls it into view. A zero-height view was laid out a point high but measured as nothing, so the whole menu scrolled. 1 pt views fixed that but left a gap of a point per service under the list; letting the list draw over them failed, since the menu clips each item to its frame.
+- The menu sends no action for items drawn by a view, on Return or on VoiceOver's press. `ViewMenuItem.perform()` takes both (a hidden Return item, `accessibilityPerformPress`) as well as clicks on its `RowView`. Return through the hidden item closes the menu, Refresh included; a click on Refresh still keeps it open. By the time the hidden Return item runs the menu may report nothing highlighted, so the last highlighted item is tracked.
+- Rows other than services are no longer accessibility elements: an element under a menu item made VoiceOver announce every one as a group to step into. Their shortcut (⌘R…) is no longer spoken, since it lives on a hidden twin.
+- Testing VO-Space by posted ⌃⌥Space failed in the VM because that chord switches the input source there; VoiceOver's AppleScript `perform action` stands in (needs `/private/var/db/Accessibility/.VoiceOverAppleScriptEnabled` and a VoiceOver restart).

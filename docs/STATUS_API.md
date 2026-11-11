@@ -2,12 +2,12 @@
 
 What a status page must serve for HealthBar to show it. This is the subset of the Atlassian Statuspage v2 public API that HealthBar reads (full reference: `/api` on any Statuspage page, e.g. <https://www.githubstatus.com/api>); incident.io pages serve the same JSON. Source of truth: [`Core/Parsing.swift`](../Core/Parsing.swift), [`Core/Fetcher.swift`](../Core/Fetcher.swift).
 
-`<base>` is the `url` from `services.json`. JSON keys are snake_case; requests are plain `GET` with `Accept: application/json`, no auth; any non-2xx response is an error.
+`<base>` is the service's address in Settings. JSON keys are snake_case; requests are plain `GET` with `Accept: application/json`, no auth; any non-2xx response is an error.
 
 | Endpoint | Required | Drives |
 |----------|----------|--------|
-| `<base>/api/v2/status.json` | yes | service status, polled every `refreshSeconds` |
-| `<base>/api/v2/summary.json` | yes | incident tooltip, component list |
+| `<base>/api/v2/status.json` | yes | service status, polled at the *Check status every* interval |
+| `<base>/api/v2/summary.json` | yes | active incidents (the row's third line and tooltip), component list |
 | `<base>/proxy/<host>/component_impacts` or `<base>/uptime_showcase` | no | 30-day strip and uptime % |
 
 A page serving only the two required files shows status and incidents, without the strip.
@@ -22,6 +22,7 @@ A page serving only the two required files shows status and incidents, without t
 ```
 
 - `page.url` — required.
+- `page.name` — optional; names a service added without a name.
 - `status.indicator` — `none` | `minor` | `major` | `critical` | `maintenance`.
 - `status.description` — required, shown as the row's text.
 
@@ -38,14 +39,7 @@ A page serving only the two required files shows status and incidents, without t
     { "id": "api", "name": "API", "group": false, "group_id": "grp1" }
   ],
   "incidents": [
-    {
-      "id": "inc1",
-      "name": "Elevated API errors",
-      "status": "investigating",
-      "impact": "minor",
-      "shortlink": "https://stspg.io/abc",
-      "incident_updates": [{ "body": "We are looking into it." }]
-    }
+    { "name": "Elevated API errors", "status": "investigating" }
   ],
   "scheduled_maintenances": []
 }
@@ -53,7 +47,7 @@ A page serving only the two required files shows status and incidents, without t
 
 - `components`, `incidents`, `scheduled_maintenances` — optional arrays.
 - Component: `id`, `name` required; `group` (bool) and `group_id` optional. Leaf components (`group` not `true`) are the ones asked for uptime; a leaf in a group is labelled `Group · Name`.
-- Incident: `id`, `name`, `status` required. `impact` uses the `indicator` values (missing → `minor`). `incident_updates` newest first; the first `body` goes in the tooltip. Link: `shortlink`, else `<page.url>/incidents/<id>`.
+- Incident: `name` and `status` required, shown as `name — status`; other fields are ignored.
 - `incidents` must list unresolved incidents only — every entry is shown as active.
 - A scheduled maintenance is shown only while its `status` is `in_progress`.
 

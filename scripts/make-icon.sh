@@ -1,5 +1,5 @@
 #!/bin/bash
-# Regenerates Resources/AppIcon.icns from design/g206.svg. Needs Inkscape.
+# Regenerates Resources/AppIcon.icns from design/g2.svg. Needs Inkscape.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -8,7 +8,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 # Artwork fills ~80% of the canvas, per the macOS icon grid.
-"$INKSCAPE" design/g206.svg --export-type=png --export-height=824 --export-filename="$TMP/art.png" >/dev/null 2>&1
+"$INKSCAPE" design/g2.svg --export-type=png --export-height=824 --export-filename="$TMP/art.png" >/dev/null 2>&1
 sips --padToHeightWidth 1024 1024 "$TMP/art.png" --out "$TMP/1024.png" >/dev/null
 
 SET="$TMP/AppIcon.iconset"
