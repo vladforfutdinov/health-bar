@@ -2,7 +2,7 @@
 
 macOS menu bar app showing the status of the services you depend on (GitHub, OpenAI, Claude, Vercel, Supabase by default).
 
-<img src="assets/screenshot.png" width="463" alt="HealthBar menu: each service with its status and a 30-day uptime strip">
+<img src="assets/screenshot.png" width="479" alt="HealthBar menu: each service with its status and a 30-day uptime strip">
 
 ## Install
 
@@ -47,13 +47,15 @@ Any Atlassian Statuspage or incident.io status page works; the platform is detec
 
 ## Menu
 
-Eight and a half services show at once, with a scroll bar for the rest. Each service row shows its status and opens the status page. A service with an active incident or a fetch error gets a third line with the first incident (and how many more) or the error; the full list is in its tooltip. Under it a 30-day strip (one bar per day, worst component that day) and the uptime of its least available component. Hovering a bar lists that day's affected components with status and duration.
+Eight and a half services show at once; the rest scroll. Each service row shows its status and opens the status page. A service with an active incident or a fetch error gets a third line with the first incident (and how many more) or the error; the full list is in its tooltip. Under it a 30-day strip (one bar per day, worst component that day) and the uptime of its least available component. Hovering a bar lists that day's affected components with status and duration.
+
+Keyboard: the arrow keys move through the services (the row lights up and scrolls into view) and the items below; Return opens the service's page or runs the item. VoiceOver reads the icon's summary on the list, each service with its status, uptime or incident, and the items by name; VO-Space acts like Return.
 
 ## Data sources
 
 | What | Statuspage | incident.io | When |
 |---|---|---|---|
-| Status | `<url>/api/v2/status.json` | same | every `refreshSeconds` (60) |
+| Status | `<url>/api/v2/status.json` | same | every *Check status every* (1 minute by default) |
 | Incidents | `<url>/api/v2/summary.json` | same | with the strip |
 | Strip | `<url>/uptime_showcase?components=<ids>` (ids and names from the summary) | `<url>/proxy/<host>/component_impacts`, names from `<url>/proxy/<host>` | at launch, then hourly, and at once when the status changes |
 
