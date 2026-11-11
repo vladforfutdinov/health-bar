@@ -181,7 +181,6 @@ final class RowView: NSView, NSViewToolTipOwner {
     private let stripX: CGFloat
     private let rightEdge: CGFloat
     private let top: CGFloat
-    private let closesMenu: Bool
     private let note: String?
     private let stripText: String?
     /// Height that shows the title and the top edge of the strip: how much of a cut-off row a list shows.
@@ -202,19 +201,17 @@ final class RowView: NSView, NSViewToolTipOwner {
     ///   - dayTip: the tooltip for strip bar `i` (oldest first), built when it is shown.
     ///   - tip: tooltip for the rest of the row.
     ///   - rightEdge: where the percentage ends, in view coordinates; the strip stretches up to it.
-    ///   - closesMenu: `false` keeps the menu open after the click.
     ///   - note: a third line under the strip (an incident or the fetch error), truncated to the row.
-    ///   - label: what VoiceOver reads; defaults to the title's text.
+    ///   - label: what VoiceOver reads; `nil` leaves the row to the enclosing menu item's title.
     ///   - stripText: drawn in the strip's place instead of its bars, e.g. when the page publishes no history.
     init(title: @escaping (Bool) -> NSAttributedString, days: [Level?]?, percent: String? = nil, lead: CGFloat = 0,
-         dayTip: ((Int) -> String)? = nil, tip: String? = nil, rightEdge: CGFloat, width: CGFloat, closesMenu: Bool = true,
+         dayTip: ((Int) -> String)? = nil, tip: String? = nil, rightEdge: CGFloat, width: CGFloat,
          note: String? = nil, label: String? = nil, stripText: String? = nil) {
         self.title = title
         self.stripText = stripText
         self.percent = percent
         self.note = note
         self.rightEdge = rightEdge
-        self.closesMenu = closesMenu
         stripX = Self.textX + lead
         // Every row reserves the widest percentage, so all strips end at the same x.
         let span = rightEdge - Self.widestPercent - Self.percentGap - stripX - 2 * Glyph.stripFrame + Glyph.stripGap
@@ -230,10 +227,12 @@ final class RowView: NSView, NSViewToolTipOwner {
         peekHeight = top + line + Self.gap + (strip.map { $0.height * 0.4 } ?? 0)
         super.init(frame: NSRect(x: 0, y: 0, width: width, height: height))
         autoresizingMask = [.width]
-        setAccessibilityElement(true)
-        setAccessibilityRole(.menuItem)
-        setAccessibilityLabel(label ?? title(false).string.replacingOccurrences(of: "\u{FFFC}", with: "").replacingOccurrences(of: "\t", with: " ")
-            .trimmingCharacters(in: .whitespaces))
+        // An element under a menu item makes VoiceOver announce the item as a group to step into.
+        setAccessibilityElement(label != nil)
+        if let label {
+            setAccessibilityRole(.menuItem)
+            setAccessibilityLabel(label)
+        }
 
         let stripY = top + line + Self.gap
         let rowTip = tip.map { text in { text } }
@@ -307,9 +306,8 @@ final class RowView: NSView, NSViewToolTipOwner {
             RunLoop.main.perform(inModes: [.common], block: onClick)
             return true
         }
-        guard let item = enclosingMenuItem, let action = item.action else { return false }
-        if closesMenu { item.menu?.cancelTracking() }
-        RunLoop.main.perform(inModes: [.common]) { NSApp.sendAction(action, to: item.target, from: item) }
+        guard let item = enclosingMenuItem as? ViewMenuItem else { return false }
+        item.perform()
         return true
     }
 }
@@ -373,15 +371,41 @@ final class ServiceListView: NSView {
     override func mouseExited(with event: NSEvent) { clearHighlight() }
 
     /// One owner for the highlight: rows scrolling under a still pointer get no enter/exit events of their own.
+    /// A pointer outside leaves it alone, so a row picked from the keyboard stays lit while it scrolls into view.
     private func updateHover() {
-        guard let window, let content = scrollView.documentView else { return }
-        let inside = bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil))
+        guard let window, let content = scrollView.documentView,
+              bounds.contains(convert(window.mouseLocationOutsideOfEventStream, from: nil)) else { return }
         let point = content.convert(window.mouseLocationOutsideOfEventStream, from: nil)
-        for row in rows { row.hovered = inside && row.frame.contains(point) }
+        for row in rows { row.hovered = row.frame.contains(point) }
+    }
+
+    /// Lights row `index` and scrolls it into view: the keyboard's selection, which the menu keeps on a stand-in item.
+    func select(_ index: Int) {
+        for (i, row) in rows.enumerated() { row.hovered = i == index }
+        rows[index].scrollToVisible(rows[index].bounds)
     }
 
     func clearHighlight() {
         rows.forEach { $0.hovered = false }
+    }
+}
+
+/// An item drawn by a view. The menu sends such an item no action on Return or on VoiceOver's press, so both
+/// (and clicks on its `RowView`) come through `perform()`.
+final class ViewMenuItem: NSMenuItem {
+    /// `false` keeps the menu open after the action.
+    var closesMenu = true
+
+    /// Sends the action after the current event, since it may refill the menu.
+    func perform() {
+        guard let action else { return }
+        if closesMenu { menu?.cancelTracking() }
+        RunLoop.main.perform(inModes: [.common]) { [self] in NSApp.sendAction(action, to: target, from: self) }
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        perform()
+        return true
     }
 }
 
@@ -415,6 +439,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Scroll offset of the services list, carried across menu refills.
     private var listScroll: CGFloat = 0
     private weak var serviceList: ServiceListView?
+    /// The item Return acts on: by then the menu may already report none highlighted.
+    private weak var lastHighlighted: NSMenuItem?
     /// Services shown at once in the menu; more scroll.
     private static let visibleServices = 8
     private var timer: Timer?
@@ -582,12 +608,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let list = ServiceListView(rows: serviceRows, visibleRows: Self.visibleServices, scroll: listScroll)
             serviceList = list
             list.onScroll = { [weak self] in self?.listScroll = $0 }
-            let item = NSMenuItem()
+            let item = NSMenuItem(title: summary(rows.map { try? $0.state.status?.get().level }), action: nil, keyEquivalent: "")
             item.view = list
+            // Disabled, so the arrow keys skip it and stop on the first stand-in; the view still gets the mouse.
+            item.isEnabled = false
             menu.addItem(item)
+            // Arrow keys and VoiceOver move between menu items only, and the list is one item: each service gets a
+            // near-invisible stand-in item, and highlighting one lights its row.
+            for (index, row) in rows.enumerated() {
+                let proxy = action("", #selector(openService(_:)))
+                // VoiceOver reads the title; a tiny font keeps it from widening the menu.
+                proxy.attributedTitle = NSAttributedString(string: Self.spoken(row.service, row.state), attributes: [.font: NSFont.systemFont(ofSize: 0.1)])
+                proxy.tag = index
+                proxy.representedObject = row.head.url
+                // Not 0: a zero-height view is laid out a point high but measured as nothing, so the menu scrolled.
+                proxy.view = NSView(frame: NSRect(x: 0, y: 0, width: 0, height: 0.1))
+                menu.addItem(proxy)
+            }
 
             menu.addItem(.separator())
         }
+        // Return: the menu sends no action for items drawn by a view.
+        let enter = NSMenuItem(title: "", action: #selector(activateHighlighted), keyEquivalent: "\r")
+        enter.keyEquivalentModifierMask = []
+        enter.target = self
+        enter.isHidden = true
+        enter.allowsKeyEquivalentWhenHidden = true
+        menu.addItem(enter)
 
         let updated = updatedAt.map { "Updated \(DateFormatter.localizedString(from: $0, dateStyle: .none, timeStyle: .short))" }
         menu.addItem(disabled(updated ?? "Updating…"))
@@ -651,7 +698,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Draws `item` as a `RowView` with `⌘<key>` right-aligned at `rightEdge`; the key itself is handled by a hidden
     /// twin item. A visible key equivalent adds a shortcut column to every row, and macOS 26 adds stock icons to
     /// standard items titled "About …", "Settings…" or "Quit …".
-    private func row(_ item: NSMenuItem, key: String? = nil, rightEdge: CGFloat, closesMenu: Bool = true) -> NSMenuItem {
+    private func row(_ item: ViewMenuItem, key: String? = nil, rightEdge: CGFloat, closesMenu: Bool = true) -> NSMenuItem {
         let font = NSFont.menuFont(ofSize: 0)
         var title = NSAttributedString(string: item.title, attributes: [.font: font, .foregroundColor: NSColor.labelColor])
         if let key {
@@ -666,8 +713,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ]), rightEdge: rightEdge)
         }
         let line = title
+        item.closesMenu = closesMenu
         item.view = RowView(title: { $0 ? Self.whitened(line) : line }, days: nil,
-                            rightEdge: RowView.textX + rightEdge, width: rightEdge + 2 * RowView.textX, closesMenu: closesMenu)
+                            rightEdge: RowView.textX + rightEdge, width: rightEdge + 2 * RowView.textX)
         return item
     }
 
@@ -744,8 +792,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return item
     }
 
-    private func action(_ title: String, _ selector: Selector) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: selector, keyEquivalent: "")
+    private func action(_ title: String, _ selector: Selector) -> ViewMenuItem {
+        let item = ViewMenuItem(title: title, action: selector, keyEquivalent: "")
         item.target = self
         return item
     }
@@ -755,6 +803,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #if SPARKLE
     @objc private func checkForUpdates() { updater?.checkForUpdates(nil) }
     #endif
+
+    @objc private func openService(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    @objc private func activateHighlighted() {
+        ((menu.highlightedItem ?? lastHighlighted) as? ViewMenuItem)?.perform()
+    }
 
     /// Not `NSApplication.terminate(_:)` directly: macOS 26 gives items with that action a stock icon, which indents the row.
     @objc private func quit() { NSApp.terminate(nil) }
@@ -832,8 +889,18 @@ extension AppDelegate: NSMenuDelegate {
 
     func menuWillOpen(_ menu: NSMenu) { menuOpen = true }
 
+    func menu(_ menu: NSMenu, willHighlight item: NSMenuItem?) {
+        if item != nil { lastHighlighted = item }
+        if let item, item.action == #selector(openService(_:)) {
+            serviceList?.select(item.tag)
+        } else {
+            serviceList?.clearHighlight()
+        }
+    }
+
     func menuDidClose(_ menu: NSMenu) {
         menuOpen = false
+        lastHighlighted = nil
         serviceList?.clearHighlight()
     }
 }
