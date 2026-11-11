@@ -5,14 +5,9 @@ struct StatuspageSummary: Decodable {
     struct Page: Decodable { let name: String?; let url: URL }
     struct Status: Decodable { let indicator: String; let description: String }
     struct Component: Decodable { let id: String; let name: String; let group: Bool?; let groupId: String? }
-    struct Update: Decodable { let body: String? }
     struct Event: Decodable {
-        let id: String
         let name: String
         let status: String
-        let impact: String?
-        let shortlink: String?
-        let incidentUpdates: [Update]?
     }
 
     let page: Page
@@ -70,11 +65,11 @@ struct IncidentIOPage: Decodable {
 private func decoder() -> JSONDecoder {
     let d = JSONDecoder()
     d.keyDecodingStrategy = .convertFromSnakeCase
+    let frac = ISO8601DateFormatter(), plain = ISO8601DateFormatter()
+    frac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     d.dateDecodingStrategy = .custom { dec in
         let s = try dec.singleValueContainer().decode(String.self)
-        let frac = ISO8601DateFormatter()
-        frac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        guard let date = frac.date(from: s) ?? ISO8601DateFormatter().date(from: s) else {
+        guard let date = frac.date(from: s) ?? plain.date(from: s) else {
             throw DecodingError.dataCorrupted(.init(codingPath: dec.codingPath, debugDescription: "bad date \(s)"))
         }
         return date
@@ -124,16 +119,7 @@ extension StatuspageSummary {
         let active = (incidents ?? []) + (scheduledMaintenances ?? []).filter { $0.status == "in_progress" }
         return ServiceDetails(
             pageURL: page.url,
-            incidents: active.map { inc in
-                Incident(
-                    name: inc.name,
-                    stage: inc.status,
-                    level: Level(indicator: inc.impact ?? "minor"),
-                    lastUpdate: inc.incidentUpdates?.first?.body,
-                    url: inc.shortlink.flatMap { $0.isEmpty ? nil : URL(string: $0) }
-                        ?? page.url.appendingPathComponent("incidents/\(inc.id)")
-                )
-            },
+            incidents: active.map { Incident(name: $0.name, stage: $0.status) },
             uptime: uptime
         )
     }

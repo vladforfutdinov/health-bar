@@ -32,7 +32,10 @@ def check(base):
     status, body = get(base + "/api/v2/summary.json")
     if status != 200:
         return "?", False
-    ids = [c["id"] for c in json.loads(body).get("components", []) if not c.get("group")]
+    try:
+        ids = [c["id"] for c in json.loads(body).get("components", []) if not c.get("group")]
+    except ValueError:  # 200 with an HTML page
+        return "?", False
     now = datetime.datetime.now(datetime.timezone.utc)
     start = now - datetime.timedelta(days=29)
     q = f"?start_at={start:%Y-%m-%dT%H:%M:%SZ}&end_at={now:%Y-%m-%dT%H:%M:%SZ}"
@@ -42,7 +45,10 @@ def check(base):
     if status != 404:
         return "incident.io", False
     status, body = get(f"{base}/uptime_showcase?components={','.join(ids[:60])}")
-    return "Statuspage", status == 200 and bool(json.loads(body or b"{}").get("timelines"))
+    try:
+        return "Statuspage", status == 200 and bool(json.loads(body or b"{}").get("timelines"))
+    except ValueError:
+        return "Statuspage", False
 
 
 def main():

@@ -41,7 +41,7 @@ Menu → Settings… (⌘,); Escape closes it. The window can be made taller; it
   - Import… / Export… save the whole configuration (services, groups, interval) as JSON and load it back; Import also reads a 0.2.x `services.json`.
 - **Check status every**: 30 seconds to 15 minutes.
 - **Launch at Login**.
-- **Updates**: automatic checks and installs, Check Now.
+- **Updates**: automatic checks and installs. Check for Updates… is in the menu.
 
 Any Atlassian Statuspage or incident.io status page works; the platform is detected automatically. Changes apply at once. Settings live in the app's user defaults; a `~/Library/Application Support/HealthBar/services.json` from 0.2.x is imported once on first launch (its services checked, the rest of the list unchecked) and then ignored. Pages added to the built-in list in later versions appear unchecked.
 

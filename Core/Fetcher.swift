@@ -22,11 +22,12 @@ public actor StatusFetcher {
     private let session: URLSession
     private var platforms: [URL: Platform] = [:]
 
-    /// Caps a whole response at 30 s: the per-request timeout only counts idle time, so a page trickling bytes could
-    /// hold a poll (and, through `pending`, every timer poll after it) indefinitely.
+    /// Caps a whole response at 30 s (the per-request timeout only counts idle time, so a page trickling bytes could
+    /// hold a poll indefinitely), and within that waits for the network: right after wake Wi-Fi takes a few seconds.
     public static let session: URLSession = {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForResource = 30
+        config.waitsForConnectivity = true
         return URLSession(configuration: config)
     }()
 
@@ -50,13 +51,17 @@ public actor StatusFetcher {
     }
 
     public func status(_ base: URL) async throws -> PageStatus {
-        try decodeStatuspage(await get(base.appendingPathComponent("api/v2/status.json"))).pageStatus
+        try await statusJSON(base).pageStatus
     }
 
     /// Checks that `base` serves a status page and returns the page's own name, if it has one.
     /// - Throws: network errors, `FetchError.http`, or `DecodingError` when it is not a status page.
     public func pageName(_ base: URL) async throws -> String? {
-        try decodeStatuspage(await get(base.appendingPathComponent("api/v2/status.json"))).page.name
+        try await statusJSON(base).page.name
+    }
+
+    private func statusJSON(_ base: URL) async throws -> StatuspageSummary {
+        try decodeStatuspage(await get(base.appendingPathComponent("api/v2/status.json")))
     }
 
     /// Incidents from `summary.json` plus the uptime strip; a failed strip leaves `uptime` nil.

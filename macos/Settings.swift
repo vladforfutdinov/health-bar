@@ -19,28 +19,20 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var launchAtLogin = SMAppService.mainApp.status == .enabled
     @Published private(set) var message: String?
     #if SPARKLE
-    let updater: SPUUpdater?
+    var updater: SPUUpdater?
     #endif
     private let fetcher: StatusFetcher
     private let onChange: (Config) -> Void
 
-    #if SPARKLE
-    init(config: Config, fetcher: StatusFetcher, updater: SPUUpdater?, onChange: @escaping (Config) -> Void) {
-        self.config = config
-        self.fetcher = fetcher
-        self.updater = updater
-        self.onChange = onChange
-    }
-    #else
     init(config: Config, fetcher: StatusFetcher, onChange: @escaping (Config) -> Void) {
         self.config = config
         self.fetcher = fetcher
         self.onChange = onChange
     }
-    #endif
 
     /// Shows `text` under Launch at Login, where the window's other errors go.
-    func report(_ text: String) { message = text }
+    /// `nil` clears it.
+    func report(_ text: String?) { message = text }
 
     func setLaunchAtLogin(_ on: Bool) {
         do {
@@ -169,12 +161,6 @@ struct SettingsView: View {
                             get: { updater.automaticallyChecksForUpdates }, set: { updater.automaticallyChecksForUpdates = $0 }))
                         Toggle("Download and install updates automatically", isOn: Binding(
                             get: { updater.automaticallyDownloadsUpdates }, set: { updater.automaticallyDownloadsUpdates = $0 }))
-                        HStack {
-                            Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?")")
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Button("Check Now") { updater.checkForUpdates() }
-                        }
                     }
                 }
                 #endif
@@ -238,14 +224,14 @@ struct SettingsView: View {
                         .tag("s:" + service.url.absoluteString)
                 }
                 .onMove { model.config.ungrouped.move(fromOffsets: $0, toOffset: $1) }
-                ForEach(model.config.groups) { group in
+                ForEach($model.config.groups) { $group in
                     DisclosureGroup(isExpanded: Binding(
                         get: { expanded.contains(group.id) },
                         set: { if $0 { expanded.insert(group.id) } else { expanded.remove(group.id) } }
                     )) {
-                        ForEach(groupServices(group.id), id: \.wrappedValue.url) { service in
-                            serviceRow(service, in: group.id)
-                                .tag("s:" + service.wrappedValue.url.absoluteString)
+                        ForEach($group.services, id: \.url) { $service in
+                            serviceRow($service, in: group.id)
+                                .tag("s:" + service.url.absoluteString)
                         }
                         .onMove { from, to in
                             guard let g = model.config.groups.firstIndex(where: { $0.id == group.id }) else { return }
@@ -285,7 +271,12 @@ struct SettingsView: View {
         guard let window = NSApp.keyWindow else { return }
         panel.beginSheetModal(for: window) { response in
             guard response == .OK, let url = panel.url else { return }
-            do { try model.config.exported().write(to: url) } catch { model.report("Export failed: \(error.localizedDescription)") }
+            do {
+                try model.config.exported().write(to: url)
+                model.report(nil)
+            } catch {
+                model.report("Export failed: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -303,6 +294,7 @@ struct SettingsView: View {
                     message: "Services, groups and the check interval are replaced by the file’s. This can’t be undone; export first to keep the current ones.",
                     choices: [Confirmation.Choice(title: "Replace") {
                         model.config = imported
+                        model.report(nil)
                         expanded = Set(imported.groups.filter { $0.services.contains(where: \.enabled) }.map(\.id))
                     }])
             } catch {
@@ -370,14 +362,6 @@ struct SettingsView: View {
             model.config.shift(s.url, by: offset)
         } else if let g = selectedGroup {
             model.config.shiftGroup(g.id, by: offset)
-        }
-    }
-
-    /// Bindings to the services of group `id`, looked up by id so a reorder can't point them at another group.
-    private func groupServices(_ id: String) -> [Binding<ServiceConfig>] {
-        guard let g = model.config.groups.firstIndex(where: { $0.id == id }) else { return [] }
-        return model.config.groups[g].services.indices.map { i in
-            Binding(get: { model.config.groups[g].services[i] }, set: { model.config.groups[g].services[i] = $0 })
         }
     }
 

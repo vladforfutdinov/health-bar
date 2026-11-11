@@ -29,16 +29,6 @@ final class StatusTests: XCTestCase {
         XCTAssertEqual(Level(componentStatus: "under_maintenance"), .maintenance)
     }
 
-    func testIconState() {
-        XCTAssertEqual(IconState(levels: [.ok, .ok]), .ok)
-        XCTAssertEqual(IconState(levels: [.ok, .maintenance]), .ok)
-        XCTAssertEqual(IconState(levels: [.ok, nil]), .ok)
-        XCTAssertEqual(IconState(levels: [.degraded, .maintenance, nil]), .degraded)
-        XCTAssertEqual(IconState(levels: [.degraded, .outage]), .outage)
-        XCTAssertEqual(IconState(levels: [nil, nil]), .unknown)
-        XCTAssertEqual(IconState(levels: []), .unknown)
-    }
-
     func testIconSectors() {
         XCTAssertEqual(iconSectors([.ok, .degraded, nil]), [.ok, .degraded, nil], "up to 10: one per service, in order")
         let ok = [Level?](repeating: .ok, count: 60)
@@ -75,8 +65,6 @@ final class StatusTests: XCTestCase {
         let openai = try decodeStatuspage(fixture("openai-summary")).details(uptime: nil)
         XCTAssertEqual(openai.incidents.count, 1)
         XCTAssertEqual(openai.incidents[0].stage, "monitoring")
-        XCTAssertNotNil(openai.incidents[0].lastUpdate)
-        XCTAssertEqual(openai.incidents[0].level, .ok, "impact none")
     }
 
     func testScheduledMaintenanceIsNotAnIncident() throws {
@@ -95,10 +83,7 @@ final class StatusTests: XCTestCase {
         """
         let s = try decodeStatuspage(Data(json.utf8)).details(uptime: nil)
         XCTAssertEqual(s.incidents.map(\.name), ["Edge errors", "DB upgrade"])
-        XCTAssertEqual(s.incidents[0].lastUpdate, "Newest")
-        XCTAssertEqual(s.incidents[0].url.absoluteString, "https://example.com/incidents/x1")
-        XCTAssertEqual(s.incidents[1].url.absoluteString, "https://stspg.io/m1")
-        XCTAssertEqual(s.incidents[1].level, .maintenance)
+        XCTAssertEqual(s.incidents[1].stage, "in_progress")
     }
 
     func testShowcaseUptimeTakesWorstComponentPerDay() throws {
@@ -260,43 +245,12 @@ final class StatusTests: XCTestCase {
         let page = ServiceConfig(name: "Z", url: URL(string: "https://z.example")!)
         config.add(page, toGroup: id)
         XCTAssertEqual(config.groups.last?.services, [page])
-        XCTAssertEqual(config.groups.last?.isCustom, true)
-        XCTAssertEqual(config.groups.first?.isCustom, false)
         XCTAssertTrue(Config.isCustom(page.url))
         XCTAssertFalse(Config.isCustom(URL(string: "https://www.githubstatus.com")!))
         XCTAssertEqual(config.services.last, page)
 
         let old = try JSONDecoder().decode(ServiceGroup.self, from: Data(#"{"name":"AI","services":[]}"#.utf8))
         XCTAssertEqual(old.id, "AI", "stored before ids: the name")
-    }
-
-    func testMovingServicesAndGroups() {
-        func names(_ c: Config, _ g: Int) -> [String] { c.groups[g].services.map(\.name) }
-        let url = { (name: String) in Config.catalog.flatMap(\.services).first { $0.name == name }!.url }
-        var c = Config.default
-
-        c.move(url("GitHub"), to: url("CircleCI"), after: true)
-        XCTAssertEqual(Array(names(c, 0).prefix(3)), ["Bitbucket", "CircleCI", "GitHub"])
-        c.move(url("GitHub"), to: url("Bitbucket"), after: false)
-        XCTAssertEqual(Array(names(c, 0).prefix(3)), ["GitHub", "Bitbucket", "CircleCI"])
-        c.move(url("GitHub"), to: url("GitHub"), after: true)
-        XCTAssertEqual(names(c, 0).first, "GitHub", "onto itself: no change")
-
-        c.move(url("Claude"), to: url("GitHub"), after: true)
-        XCTAssertEqual(Array(names(c, 0).prefix(3)), ["GitHub", "Claude", "Bitbucket"], "across groups")
-        XCTAssertFalse(names(c, 1).contains("Claude"))
-
-        c.move(url("Claude"), intoGroup: "Databases")
-        XCTAssertEqual(c.groups[3].services.first?.name, "Claude", "dropped on a header: top of that group")
-        XCTAssertEqual(c.services.map(\.name), ["GitHub", "OpenAI", "Vercel", "Claude", "Supabase"])
-
-        c.moveGroup("Databases", to: "Git, CI", after: false)
-        XCTAssertEqual(c.groups.prefix(3).map(\.name), ["Databases", "Git, CI", "AI"])
-        c.moveGroup("Databases", to: "AI", after: true)
-        XCTAssertEqual(c.groups.prefix(3).map(\.name), ["Git, CI", "AI", "Databases"])
-        c.moveGroup("Git, CI", to: c.groups.last!.id, after: true)
-        XCTAssertEqual(c.groups.last?.name, "Git, CI", "after the last group")
-        XCTAssertEqual(c.addingMissing(from: Config.catalog), c, "moved catalog pages are not re-added")
     }
 
     func testReplacingAService() {
@@ -322,17 +276,18 @@ final class StatusTests: XCTestCase {
         XCTAssertEqual(c.services.first, solo, "ungrouped come first")
         XCTAssertEqual(c.group(of: solo.url), Config.noGroup)
 
-        c.move(url("GitHub"), to: solo.url, after: true)
-        XCTAssertEqual(c.ungrouped.map(\.name), ["Solo", "GitHub"], "dragged out of a group")
-        c.move(solo.url, intoGroup: "AI")
-        XCTAssertEqual(c.groups[1].services.first, solo)
+        let gh = c.groups[0].services[0]
+        c.replace(gh.url, with: gh, inGroup: Config.noGroup)
+        XCTAssertEqual(c.ungrouped.map(\.name), ["Solo", "GitHub"], "moved out of a group")
+        c.replace(solo.url, with: solo, inGroup: "AI")
+        XCTAssertEqual(c.groups[1].services.last, solo)
 
         let mine = c.addGroup(named: "Mine")
-        c.move(solo.url, intoGroup: mine)
+        c.replace(solo.url, with: solo, inGroup: mine)
         c.removeGroup(mine, keepingServices: true)
         XCTAssertEqual(c.ungrouped.last, solo, "kept: moved outside the groups")
         let other = c.addGroup(named: "Other")
-        c.move(solo.url, intoGroup: other)
+        c.replace(solo.url, with: solo, inGroup: other)
         c.removeGroup(other, keepingServices: false)
         XCTAssertFalse(c.contains(solo.url))
 
@@ -372,6 +327,24 @@ final class StatusTests: XCTestCase {
         let legacy = Data(#"{"refreshSeconds":45,"services":[{"name":"X","url":"https://x.example"}]}"#.utf8)
         XCTAssertEqual(try Config.importing(legacy).services.map(\.name), ["X"], "0.2.x files import too")
         XCTAssertThrowsError(try Config.importing(Data("{}".utf8)))
+    }
+
+    func testUnreadableStoredConfigIsKept() throws {
+        let defaults = scratchDefaults()
+        let newer = Data(#"{"refreshSeconds":"60","groups":[]}"#.utf8)
+        defaults.set(newer, forKey: Config.defaultsKey)
+        XCTAssertEqual(Config.load(from: defaults, legacyFile: try scratchFile(nil)), .default)
+        XCTAssertEqual(defaults.data(forKey: Config.unreadableKey), newer, "kept before it is replaced")
+    }
+
+    func testImportDropsRepeatedAddresses() throws {
+        let legacy = Data(#"{"refreshSeconds":60,"services":[{"name":"X","url":"https://x.example"},{"name":"X2","url":"https://x.example"}]}"#.utf8)
+        XCTAssertEqual(try Config.importing(legacy).ungrouped.map(\.name), ["X"])
+        var c = Config.default
+        c.add(ServiceConfig(name: "Dup", url: c.groups[0].services[0].url), toGroup: Config.noGroup)
+        let back = try Config.importing(c.exported())
+        XCTAssertEqual(back.ungrouped.map(\.name), ["Dup"], "first one wins")
+        XCTAssertFalse(back.groups[0].services.contains { $0.url == c.groups[0].services[0].url })
     }
 
     func testPageURLFromTypedText() {

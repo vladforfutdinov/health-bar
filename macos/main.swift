@@ -186,8 +186,9 @@ final class RowView: NSView, NSViewToolTipOwner {
     private let stripText: String?
     /// Height that shows the title and the top edge of the strip: how much of a cut-off row a list shows.
     let peekHeight: CGFloat
-    private var tips: [NSView.ToolTipTag: String] = [:]
+    private var tips: [NSView.ToolTipTag: () -> String] = [:]
     private static let noteFont = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
+    private static let widestPercent = ceil(NSAttributedString(string: percentText(100), attributes: [.font: percentFont]).size().width)
 
     /// Uptime as the user's locale writes a percentage, two decimals.
     static func percentText(_ percent: Double) -> String {
@@ -198,7 +199,7 @@ final class RowView: NSView, NSViewToolTipOwner {
     ///   - days: strip bars, oldest first; `nil` for a single-line row.
     ///   - percent: shown right of the strip.
     ///   - lead: strip offset from the title's left edge, to align it with the service name.
-    ///   - dayTips: one tooltip per strip bar, oldest first.
+    ///   - dayTip: the tooltip for strip bar `i` (oldest first), built when it is shown.
     ///   - tip: tooltip for the rest of the row.
     ///   - rightEdge: where the percentage ends, in view coordinates; the strip stretches up to it.
     ///   - closesMenu: `false` keeps the menu open after the click.
@@ -206,7 +207,7 @@ final class RowView: NSView, NSViewToolTipOwner {
     ///   - label: what VoiceOver reads; defaults to the title's text.
     ///   - stripText: drawn in the strip's place instead of its bars, e.g. when the page publishes no history.
     init(title: @escaping (Bool) -> NSAttributedString, days: [Level?]?, percent: String? = nil, lead: CGFloat = 0,
-         dayTips: [String] = [], tip: String? = nil, rightEdge: CGFloat, width: CGFloat, closesMenu: Bool = true,
+         dayTip: ((Int) -> String)? = nil, tip: String? = nil, rightEdge: CGFloat, width: CGFloat, closesMenu: Bool = true,
          note: String? = nil, label: String? = nil, stripText: String? = nil) {
         self.title = title
         self.stripText = stripText
@@ -216,8 +217,7 @@ final class RowView: NSView, NSViewToolTipOwner {
         self.closesMenu = closesMenu
         stripX = Self.textX + lead
         // Every row reserves the widest percentage, so all strips end at the same x.
-        let widest = ceil(NSAttributedString(string: Self.percentText(100), attributes: [.font: Self.percentFont]).size().width)
-        let span = rightEdge - widest - Self.percentGap - stripX - 2 * Glyph.stripFrame + Glyph.stripGap
+        let span = rightEdge - Self.widestPercent - Self.percentGap - stripX - 2 * Glyph.stripFrame + Glyph.stripGap
         let bar = days.map { max(Glyph.stripBar, span / CGFloat(max($0.count, 1)) - Glyph.stripGap) } ?? Glyph.stripBar
         self.days = days
         self.bar = bar
@@ -236,13 +236,16 @@ final class RowView: NSView, NSViewToolTipOwner {
             .trimmingCharacters(in: .whitespaces))
 
         let stripY = top + line + Self.gap
-        addTip(NSRect(x: 0, y: 0, width: width, height: stripY), tip)
-        if let strip {
-            for (i, text) in dayTips.enumerated() {
-                let x = stripX + Glyph.stripFrame + CGFloat(i) * (bar + Glyph.stripGap) - Glyph.stripGap / 2
-                addTip(NSRect(x: x, y: stripY, width: bar + Glyph.stripGap, height: strip.height), text)
+        let rowTip = tip.map { text in { text } }
+        addTip(NSRect(x: 0, y: 0, width: width, height: stripY), rowTip)
+        if let strip, let days {
+            if let dayTip {
+                for i in days.indices {
+                    let x = stripX + Glyph.stripFrame + CGFloat(i) * (bar + Glyph.stripGap) - Glyph.stripGap / 2
+                    addTip(NSRect(x: x, y: stripY, width: bar + Glyph.stripGap, height: strip.height)) { dayTip(i) }
+                }
             }
-            addTip(NSRect(x: stripX + strip.width, y: stripY, width: width, height: height - stripY), tip)
+            addTip(NSRect(x: stripX + strip.width, y: stripY, width: width, height: height - stripY), rowTip)
         }
     }
 
@@ -250,13 +253,13 @@ final class RowView: NSView, NSViewToolTipOwner {
 
     override var isFlipped: Bool { true }
 
-    private func addTip(_ rect: NSRect, _ text: String?) {
+    private func addTip(_ rect: NSRect, _ text: (() -> String)?) {
         guard let text else { return }
         tips[addToolTip(rect, owner: self, userData: nil)] = text
     }
 
     func view(_ view: NSView, stringForToolTip tag: NSView.ToolTipTag, point: NSPoint, userData data: UnsafeMutableRawPointer?) -> String {
-        tips[tag] ?? ""
+        tips[tag]?() ?? ""
     }
 
     /// Set for a row inside `ServiceListView`: clicking runs it, and `hovered` (set by the list) drives the
@@ -293,7 +296,12 @@ final class RowView: NSView, NSViewToolTipOwner {
         text.draw(at: NSPoint(x: rightEdge - text.size().width, y: y + (strip.height - text.size().height) / 2))
     }
 
-    override func accessibilityPerformPress() -> Bool {
+    override func accessibilityPerformPress() -> Bool { press() }
+
+    override func mouseUp(with event: NSEvent) { _ = press() }
+
+    /// Runs `onClick`, or sends the menu item's action; after this event, since the action may refill the menu.
+    private func press() -> Bool {
         if let onClick {
             enclosingMenuItem?.menu?.cancelTracking()
             RunLoop.main.perform(inModes: [.common], block: onClick)
@@ -303,18 +311,6 @@ final class RowView: NSView, NSViewToolTipOwner {
         if closesMenu { item.menu?.cancelTracking() }
         RunLoop.main.perform(inModes: [.common]) { NSApp.sendAction(action, to: item.target, from: item) }
         return true
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        if let onClick {
-            enclosingMenuItem?.menu?.cancelTracking()
-            RunLoop.main.perform(inModes: [.common], block: onClick)
-            return
-        }
-        guard let item = enclosingMenuItem, let action = item.action else { return }
-        if closesMenu { item.menu?.cancelTracking() }
-        // After this event: the action may refill the menu, removing this view.
-        RunLoop.main.perform(inModes: [.common]) { NSApp.sendAction(action, to: item.target, from: item) }
     }
 }
 
@@ -404,12 +400,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let menu = NSMenu()
     private let fetcher = StatusFetcher()
     private var config = Config.default
-    private var states: [ServiceState] = []
+    /// Last result per service, by address: results are matched to services by URL, never by position.
+    private var states: [URL: ServiceState] = [:]
     private var updatedAt: Date?
-    /// Services whose result for the current poll has not arrived yet.
-    private var pending = 0
-    /// Bumped per poll; a slower, superseded poll's results are dropped.
-    private var generation = 0
+    /// Requests started and not answered; a timer poll skips these and reads the rest.
+    private var inFlight: [URL: Int] = [:]
+    /// Bumped per request; an answer counts only if no later request for its service was started.
+    private var requestID = 0
+    /// The menu is rebuilt only while open, or when it opens after something changed.
+    private var menuOpen = false
+    private var menuStale = true
     /// Right edge of the last rendered menu; kept while services load so their shorter "updating…" titles don't pull it in.
     private var titleEdge: CGFloat = 0
     /// Scroll offset of the services list, carried across menu refills.
@@ -458,65 +458,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let old = config
         config = new
         if new.refreshSeconds != old.refreshSeconds { startTimer() }
-        guard new.services.map(\.url) != old.services.map(\.url) else { return render() }
-        let known = Dictionary(zip(old.services.map(\.url), states), uniquingKeysWith: { a, _ in a })
-        states = new.services.map { known[$0.url] ?? ServiceState() }
-        // Results in flight are indexed by the old list.
-        generation += 1
-        pending = 0
-        poll(force: false)
+        let urls = Set(new.services.map(\.url))
+        states = states.filter { urls.contains($0.key) }
+        inFlight = inFlight.filter { urls.contains($0.key) }
+        poll(new.services.filter { states[$0.url] == nil }, force: false)
     }
 
     @objc private func displayOptionsChanged() { render() }
 
-
-
     /// Launch, wake and the Refresh item drop what is shown and read everything again, details included.
     @objc private func refresh() {
-        states = config.services.map { _ in ServiceState() }
+        states = [:]
         updatedAt = nil
-        poll(force: true)
+        poll(config.services, force: true)
     }
 
-    /// Every service reads its status; details follow per `detailsDue` unless `force`.
     private func poll(force: Bool) {
-        if pending > 0 && !force { return }
-        generation += 1
-        pending = config.services.count
-        if pending == 0 { updatedAt = Date() }
-        let gen = generation, fetcher = fetcher
-        for (i, service) in config.services.enumerated() {
-            let before = states[i]
+        poll(config.services.filter { inFlight[$0.url] == nil }, force: force)
+    }
+
+    /// Each of `services` reads its status, details following per `detailsDue` unless `force`; a request already in
+    /// flight for one of them is superseded.
+    private func poll(_ services: [ServiceConfig], force: Bool) {
+        let fetcher = fetcher
+        for service in services {
+            requestID += 1
+            let id = requestID, url = service.url, before = states[url] ?? ServiceState()
+            inFlight[url] = id
             // Off the main actor, back through the run loop: the main queue is not drained while the menu is open.
             Task.detached {
                 let after = await fetcher.poll(service, before, force: force)
                 RunLoop.main.perform(inModes: [.common]) {
-                    MainActor.assumeIsolated { [weak self] in self?.apply(after, at: i, generation: gen) }
+                    MainActor.assumeIsolated { [weak self] in self?.apply(after, for: url, request: id) }
                 }
             }
         }
+        if inFlight.isEmpty { updatedAt = Date() }
         render()
     }
 
     /// Each service renders as soon as its own result arrives.
-    private func apply(_ state: ServiceState, at i: Int, generation gen: Int) {
-        guard gen == generation, i < states.count else { return }
-        states[i] = state
-        pending -= 1
-        if pending == 0 { updatedAt = Date() }
+    private func apply(_ state: ServiceState, for url: URL, request id: Int) {
+        guard inFlight[url] == id else { return }
+        inFlight[url] = nil
+        states[url] = state
+        if inFlight.isEmpty { updatedAt = Date() }
         render()
     }
 
     private func render() {
-        let levels = states.map { try? $0.status?.get().level }
+        let levels = config.services.map { try? states[$0.url]?.status?.get().level }
         setIcon(levels, label: summary(levels))
-        fillMenu()
+        if menuOpen { fillMenu() } else { menuStale = true }
     }
 
     /// The icon's state as a sentence, for VoiceOver and the tooltip.
     private func summary(_ levels: [Level?]) -> String {
         guard updatedAt != nil else { return "Loading" }
-        let names = zip(config.services, levels).filter { $0.1 != .ok && $0.1 != nil }.map(\.0.name)
+        guard !levels.isEmpty else { return "No services" }
+        // Unreachable services (nil) count as problems too.
+        let names = zip(config.services, levels).filter { $0.1 != .ok }.map(\.0.name)
         let total = String(AttributedString(localized: "^[\(levels.count) service](inflect: true)").characters)
         if names.isEmpty { return "All \(total) operational" }
         return "\(names.count) of \(total) with problems: " + names.prefix(3).joined(separator: ", ") + (names.count > 3 ? "…" : "")
@@ -543,22 +544,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func fillMenu() {
         menu.removeAllItems()
-        let rows = config.services.enumerated().map { i, service in
-            let state = i < states.count ? states[i] : ServiceState()
-            return (item: serviceItem(service, state), uptime: state.details?.uptime, service: service, state: state)
+        menuStale = false
+        let rows = config.services.map { service in
+            let state = states[service.url] ?? ServiceState()
+            return (head: serviceHead(service, state), uptime: state.details?.uptime, service: service, state: state)
         }
-        var right = (rows.compactMap { $0.item.attributedTitle?.size().width }.max() ?? 0) + 20
-        if pending > 0 { right = max(right, titleEdge) }
+        var right = (rows.map { $0.head.title.size().width }.max() ?? 0) + 20
+        if !inFlight.isEmpty { right = max(right, titleEdge) }
         titleEdge = right
         var serviceRows: [RowView] = []
         for row in rows {
-            let base = row.item.attributedTitle ?? NSAttributedString()
-            let marked = { (highlighted: Bool) -> NSAttributedString in
-                let line = highlighted ? Self.whitened(base) : base
-                guard let mark = self.linkMark(highlighted ? .selectedMenuItemTextColor : .secondaryLabelColor) else { return line }
-                return self.trailing(line, mark, rightEdge: right)
-            }
-            var tip = row.item.toolTip
+            // Both versions built once per refill, not on every draw (rows redraw on each scroll step).
+            let plain = trailing(row.head.title, Self.linkMarks.plain, rightEdge: right)
+            let lit = trailing(Self.whitened(row.head.title), Self.linkMarks.highlighted, rightEdge: right)
+            let marked = { (highlighted: Bool) in highlighted ? lit : plain }
+            var tip = row.head.tip
             if let uptime = row.uptime {
                 let note = "Last \(uptime.days.count) days; uptime of the least available component"
                 tip = tip.map { $0 + "\n\n" + note } ?? note
@@ -568,13 +568,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 title: marked, days: row.uptime?.days.map(\.level) ?? Array(repeating: nil, count: StatusFetcher.historyDays),
                 percent: row.uptime.map { RowView.percentText($0.percent) },
                 lead: 12 + NSAttributedString(string: "  ", attributes: [.font: NSFont.menuFont(ofSize: 0)]).size().width,
-                dayTips: row.uptime?.days.map(dayTip) ?? [], tip: tip,
+                dayTip: row.uptime.map { uptime in { Self.dayTip(uptime.days[$0]) } }, tip: tip,
                 rightEdge: RowView.textX + right, width: right + 2 * RowView.textX,
                 note: Self.note(row.state), label: Self.spoken(row.service, row.state),
                 // Read, but the page publishes no per-day history (uptime display off, or the feed refused).
                 stripText: row.state.details != nil && row.uptime == nil ? "No uptime history" : nil)
-            let url = row.item.representedObject as? URL
-            view.onClick = { if let url { NSWorkspace.shared.open(url) } }
+            let url = row.head.url
+            view.onClick = { NSWorkspace.shared.open(url) }
             serviceRows.append(view)
         }
         if !serviceRows.isEmpty {
@@ -595,6 +595,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(row(action("Refresh", #selector(refresh)), key: "r", rightEdge: right, closesMenu: false))
         menu.addItem(.separator())
         menu.addItem(row(action("About HealthBar", #selector(openAbout)), rightEdge: right))
+        #if SPARKLE
+        menu.addItem(row(action("Check for Updates…", #selector(checkForUpdates)), rightEdge: right))
+        #endif
         menu.addItem(row(action("Settings…", #selector(openSettings)), key: ",", rightEdge: right))
         menu.addItem(.separator())
         menu.addItem(row(action("Quit HealthBar", #selector(quit)), key: "q", rightEdge: right))
@@ -630,21 +633,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return white
     }
 
-    /// The row opens the status page; failure and incidents go to the tooltip.
-    private func serviceItem(_ service: ServiceConfig, _ state: ServiceState) -> NSMenuItem {
-        let item = open("", state.details?.pageURL ?? service.url)
+    /// A service row's first line, its tooltip (the failure, or every active incident) and the page it opens.
+    private func serviceHead(_ service: ServiceConfig, _ state: ServiceState) -> (title: NSAttributedString, tip: String?, url: URL) {
+        let url = state.details?.pageURL ?? service.url
         switch state.status {
         case nil:
-            setTitle(item, "\(service.name) — updating…", Glyph.dashed(Glyph.color(nil)))
+            return (titled("\(service.name) — updating…", Glyph.dashed(Glyph.color(nil))), nil, url)
         case .failure(let error):
-            setTitle(item, "\(service.name) — unreachable", Glyph.dashed(Glyph.color(nil)), color: .secondaryLabelColor)
-            item.toolTip = error.localizedDescription
+            return (titled("\(service.name) — unreachable", Glyph.dashed(Glyph.color(nil)), color: .secondaryLabelColor), error.localizedDescription, url)
         case .success(let page):
-            setTitle(item, "\(service.name) — \(page.description)", Glyph(page.level))
             let incidents = state.details?.incidents ?? []
-            if !incidents.isEmpty { item.toolTip = incidents.map { "\($0.name) — \($0.stage)" }.joined(separator: "\n") }
+            let tip = incidents.isEmpty ? nil : incidents.map { "\($0.name) — \($0.stage)" }.joined(separator: "\n")
+            return (titled("\(service.name) — \(page.description)", Glyph(page.level)), tip, url)
         }
-        return item
     }
 
     /// Draws `item` as a `RowView` with `⌘<key>` right-aligned at `rightEdge`; the key itself is handled by a hidden
@@ -670,11 +671,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return item
     }
 
-    private func linkMark(_ color: NSColor) -> NSAttributedString? {
+    /// The external-link mark after a service's title, plain and on the selection highlight.
+    private static let linkMarks = (plain: linkMark(.secondaryLabelColor), highlighted: linkMark(.selectedMenuItemTextColor))
+
+    private static func linkMark(_ color: NSColor) -> NSAttributedString {
         guard let icon = NSImage(systemSymbolName: "arrow.up.right.square", accessibilityDescription: "Opens in browser")?
             .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 12, weight: .regular)
                 .applying(NSImage.SymbolConfiguration(paletteColors: [color])))
-        else { return nil }
+        else { return NSAttributedString() }
         let mark = NSTextAttachment()
         mark.image = icon
         mark.bounds = NSRect(origin: NSPoint(x: 0, y: (NSFont.menuFont(ofSize: 0).capHeight - icon.size.height) / 2), size: icon.size)
@@ -693,29 +697,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return line
     }
 
-    /// Glyph goes into the title, not `NSMenuItem.image`: macOS 27 menus don't draw item images.
-    private func setTitle(_ item: NSMenuItem, _ text: String, _ glyph: Glyph, color: NSColor? = nil) {
+    /// The status glyph and text of a row; the glyph is an attachment because macOS 27 menus don't draw item images.
+    private func titled(_ text: String, _ glyph: Glyph, color: NSColor? = nil) -> NSAttributedString {
         let font = NSFont.menuFont(ofSize: 0)
         let dot = NSTextAttachment()
         dot.image = glyph.image(size: 12)
         dot.bounds = NSRect(x: 0, y: (font.capHeight - 12) / 2, width: 12, height: 12)
-        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color ?? .labelColor]
         let title = NSMutableAttributedString(attachment: dot)
-        title.append(NSAttributedString(string: "  " + text, attributes: attrs))
-        item.title = text
-        item.attributedTitle = title
+        title.append(NSAttributedString(string: "  " + text, attributes: [.font: font, .foregroundColor: color ?? .labelColor]))
+        return title
     }
 
-    /// Date, then each affected component with its status and time in it, most severe first.
-    private func dayTip(_ day: UptimeDay) -> String {
-        let date = DateFormatter()
-        date.setLocalizedDateFormatFromTemplate("EEE d MMM")
-        let head = date.string(from: day.date)
+    private static let dayFormat: DateFormatter = {
+        let f = DateFormatter()
+        f.setLocalizedDateFormatFromTemplate("EEE d MMM")
+        return f
+    }()
+
+    private static let spanFormat: DateComponentsFormatter = {
+        let f = DateComponentsFormatter()
+        f.unitsStyle = .abbreviated
+        f.allowedUnits = [.hour, .minute, .second]
+        f.maximumUnitCount = 2
+        return f
+    }()
+
+    /// Date, then each affected component with its status and time in it, most severe first. Built on hover.
+    private static func dayTip(_ day: UptimeDay) -> String {
+        let head = dayFormat.string(from: day.date)
         if day.outages.isEmpty { return "\(head) — no outages" }
-        let span = DateComponentsFormatter()
-        span.unitsStyle = .abbreviated
-        span.allowedUnits = [.hour, .minute, .second]
-        span.maximumUnitCount = 2
+        let span = spanFormat
         var order: [String] = [], parts: [String: [String]] = [:]
         for o in day.outages {
             if parts[o.component] == nil { order.append(o.component) }
@@ -733,23 +744,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return item
     }
 
-    private func action(_ title: String, _ selector: Selector, key: String = "") -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: selector, keyEquivalent: key)
+    private func action(_ title: String, _ selector: Selector) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: selector, keyEquivalent: "")
         item.target = self
-        return item
-    }
-
-    private func open(_ title: String, _ url: URL) -> NSMenuItem {
-        let item = action(title, #selector(openURL(_:)))
-        item.representedObject = url
         return item
     }
 
     // MARK: Actions
 
-    @objc private func openURL(_ sender: NSMenuItem) {
-        if let url = sender.representedObject as? URL { NSWorkspace.shared.open(url) }
-    }
+    #if SPARKLE
+    @objc private func checkForUpdates() { updater?.checkForUpdates(nil) }
+    #endif
 
     /// Not `NSApplication.terminate(_:)` directly: macOS 26 gives items with that action a stock icon, which indents the row.
     @objc private func quit() { NSApp.terminate(nil) }
@@ -784,10 +789,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openSettings() {
         if settingsWindow == nil {
             let onChange: (Config) -> Void = { [weak self] in self?.configChanged($0) }
-            #if SPARKLE
-            let model = SettingsModel(config: config, fetcher: fetcher, updater: updater?.updater, onChange: onChange)
-            #else
             let model = SettingsModel(config: config, fetcher: fetcher, onChange: onChange)
+            #if SPARKLE
+            model.updater = updater?.updater
             #endif
             let window = SettingsWindow(contentRect: .zero, styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
             let hosting = NSHostingController(rootView: SettingsView(model: model))
@@ -821,7 +825,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate: NSMenuDelegate {
+    /// Called before the menu opens: it is rebuilt here only if something changed while it was closed.
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        if menuStale { fillMenu() }
+    }
+
+    func menuWillOpen(_ menu: NSMenu) { menuOpen = true }
+
     func menuDidClose(_ menu: NSMenu) {
+        menuOpen = false
         serviceList?.clearHighlight()
     }
 }

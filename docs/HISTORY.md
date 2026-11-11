@@ -128,3 +128,13 @@ Details (incidents and the strip) are read hourly and at once on a status change
 - Import… / Export… read and write the whole config as JSON (`Config.importing` also takes a 0.2.x `services.json`); import replaces after a confirmation.
 - `docs/SERVICES.md` lists the catalog with platform, default and whether each page publishes history; regenerate with `scripts/services-doc.py`.
 - A band across the strips of rows scrolled into view in the dark menu (macOS 27, Retina; not reproduced in the macOS 26 VM): the part drawn while the row peeked out had dark-theme colours, the rest looked like the light palette. The band showed only while scrolling and went away when the rows were redrawn after it (`didEndLiveScroll`), so it is responsive scrolling's pre-rendered overdraw; opting the list out of responsive scrolling, or drawing inside `performAsCurrentDrawingAppearance`, did not help. The strip was an `NSImage` with a drawing handler, which AppKit runs later and caches outside the view's appearance; it is now drawn directly in `RowView.draw`, which did not help either. What works is a full redraw: visible rows repaint on every scroll step (confirmed on the user's Mac). Likely a macOS 27 compositing bug; the responsive-scrolling opt-out and direct strip drawing stay, harmless, though not shown to be needed.
+
+## 2026-11-11 — audit fixes
+
+From a whole-repo review:
+- Polling is keyed by URL: each request has an id, a timer poll skips only services still in flight, and a config change reads only new services (previously a checkbox re-read all, and one slow page held every timer poll).
+- The menu is rebuilt only while open, or when it opens after a change (`menuNeedsUpdate`); closed, a result only redraws the icon. Day tooltips are built on hover with shared formatters, instead of ~30 per row on every refill.
+- The session waits for connectivity (within the 30 s cap): after wake every service used to fail at once and stay "unreachable" until the next poll.
+- The icon's summary counts unreachable services as problems.
+- A stored config that can't be decoded (e.g. after a downgrade) is kept under `config.unreadable` before the default replaces it. Import drops repeated addresses.
+- Removed: `IconState`, `Config.move(_:to:after:)`, `move(_:intoGroup:)`, `moveGroup`, `ServiceGroup.isCustom`, unused incident fields, the `NSMenuItem` used only as a title holder, the two `SettingsModel` inits. Version / Check Now left Settings; Check for Updates… is a menu item again.

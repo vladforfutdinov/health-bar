@@ -48,8 +48,6 @@ public struct ServiceGroup: Codable, Equatable, Sendable, Identifiable {
         services = try c.decode([ServiceConfig].self, forKey: .services)
     }
 
-    /// The user made it: it can be renamed and removed.
-    public var isCustom: Bool { !Config.catalog.contains { $0.id == id } }
 }
 
 public struct Config: Codable, Equatable, Sendable {
@@ -87,6 +85,7 @@ public struct Config: Codable, Equatable, Sendable {
     public static let refreshChoices = [30, 60, 120, 300, 900]
 
     static let defaultsKey = "config"
+    static let unreadableKey = "config.unreadable"
 
     /// Where versions up to 0.2.x kept the config; read once by `load` and left in place.
     public static var legacyFileURL: URL {
@@ -103,24 +102,32 @@ public struct Config: Codable, Equatable, Sendable {
     /// The stored config, with catalog pages it doesn't know yet added (disabled). With nothing stored it imports
     /// `legacyFile` (or takes `default` when that is missing or malformed) and stores the result, so the file is
     /// read at most once.
+    /// Stored data it can't read (say, written by a newer version) is kept under `unreadableKey` before being replaced.
     public static func load(from defaults: UserDefaults = .standard, legacyFile: URL = legacyFileURL) -> Config {
-        if let data = defaults.data(forKey: defaultsKey), let stored = try? JSONDecoder().decode(Config.self, from: data) {
-            return stored.addingMissing(from: catalog)
+        if let data = defaults.data(forKey: defaultsKey) {
+            if let stored = try? JSONDecoder().decode(Config.self, from: data) { return stored.addingMissing(from: catalog) }
+            defaults.set(data, forKey: unreadableKey)
         }
         let config = (try? JSONDecoder().decode(Legacy.self, from: Data(contentsOf: legacyFile))).map(imported) ?? .default
         config.save(to: defaults)
         return config
     }
 
-    /// A config from an exported file, or from a 0.2.x `services.json`; catalog pages it lacks are added unchecked.
+    /// A config from an exported file, or from a 0.2.x `services.json`; catalog pages it lacks are added unchecked,
+    /// and an address listed twice is kept once.
     /// - Throws: `DecodingError` when the data is neither.
     public static func importing(_ data: Data) throws -> Config {
-        if let config = try? JSONDecoder().decode(Config.self, from: data) {
+        if var config = try? JSONDecoder().decode(Config.self, from: data) {
+            var seen = Set<URL>()
+            config.ungrouped = config.ungrouped.filter { seen.insert($0.url).inserted }
+            for g in config.groups.indices { config.groups[g].services = config.groups[g].services.filter { seen.insert($0.url).inserted } }
             var c = config.addingMissing(from: catalog)
             c.refreshSeconds = snapped(c.refreshSeconds)
             return c
         }
-        return imported(try JSONDecoder().decode(Legacy.self, from: data))
+        let legacy = try JSONDecoder().decode(Legacy.self, from: data)
+        var seen = Set<URL>()
+        return imported(Legacy(refreshSeconds: legacy.refreshSeconds, services: legacy.services.filter { seen.insert($0.url).inserted }))
     }
 
     /// Readable JSON for Export; `importing` reads it back.
@@ -217,29 +224,6 @@ public struct Config: Codable, Equatable, Sendable {
     /// The id of the group holding the page `url`; `noGroup` outside the groups.
     public func group(of url: URL) -> String? {
         locate(url).map { $0.group.map { groups[$0].id } ?? Self.noGroup }
-    }
-
-    /// Moves the page `url` next to `target`, before or after it, possibly into another group.
-    public mutating func move(_ url: URL, to target: URL, after: Bool) {
-        guard url != target, let from = locate(url) else { return }
-        let service = edit(from.group) { $0.remove(at: from.index) }
-        guard let to = locate(target) else { return edit(from.group) { $0.insert(service, at: from.index) } }
-        edit(to.group) { $0.insert(service, at: to.index + (after ? 1 : 0)) }
-    }
-
-    /// Moves the page `url` to the top of the group `id`.
-    public mutating func move(_ url: URL, intoGroup id: String) {
-        guard let from = locate(url), let to = slot(id) else { return }
-        let service = edit(from.group) { $0.remove(at: from.index) }
-        edit(to) { $0.insert(service, at: 0) }
-    }
-
-    /// Moves the group `id` next to the group `target`, before or after it.
-    public mutating func moveGroup(_ id: String, to target: String, after: Bool) {
-        guard id != target, let from = groups.firstIndex(where: { $0.id == id }) else { return }
-        let group = groups.remove(at: from)
-        guard let to = groups.firstIndex(where: { $0.id == target }) else { return groups.insert(group, at: from) }
-        groups.insert(group, at: to + (after ? 1 : 0))
     }
 
     /// Moves the page `url` up (negative) or down within its own list; stops at the ends.

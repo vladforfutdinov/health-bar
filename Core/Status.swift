@@ -30,10 +30,8 @@ public enum Level: Int, Comparable, Sendable {
 
 public struct Incident: Equatable, Sendable {
     public var name: String
+    /// `investigating`, `identified`, `monitoring`, `in_progress`…
     public var stage: String
-    public var level: Level
-    public var lastUpdate: String?
-    public var url: URL
 }
 
 /// The page-wide indicator from `/api/v2/status.json`.
@@ -113,19 +111,4 @@ public func iconSectors(_ levels: [Level?], limit: Int = 10) -> [Level?] {
         sectors += Array(repeating: kind, count: min(share, limit - sectors.count))
     }
     return sectors + Array(repeating: .ok, count: limit - sectors.count)
-}
-
-public enum IconState: Equatable, Sendable {
-    case ok, degraded, outage, unknown
-
-    /// Maintenance and failed fetches don't colour the icon; it goes grey only when nothing loaded.
-    public init(levels: [Level?]) {
-        let loaded = levels.compactMap { $0 }
-        if loaded.isEmpty { self = .unknown; return }
-        switch loaded.max()! {
-        case .outage: self = .outage
-        case .degraded: self = .degraded
-        case .ok, .maintenance: self = .ok
-        }
-    }
 }
