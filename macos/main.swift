@@ -766,6 +766,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bringForward(nil)
     }
 
+    /// Settings window content size: the width, and the least height (also the SwiftUI frame's).
+    static let settingsSize = NSSize(width: 480, height: 570)
+
     @objc private func openSettings() {
         if settingsWindow == nil {
             let onChange: (Config) -> Void = { [weak self] in self?.configChanged($0) }
@@ -774,12 +777,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             #else
             let model = SettingsModel(config: config, fetcher: fetcher, onChange: onChange)
             #endif
-            let window = SettingsWindow(contentRect: .zero, styleMask: [.titled, .closable], backing: .buffered, defer: false)
-            window.contentViewController = NSHostingController(rootView: SettingsView(model: model))
+            let window = SettingsWindow(contentRect: .zero, styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+            let hosting = NSHostingController(rootView: SettingsView(model: model))
+            // Only the height changes (the list grows); the width is fixed and the default height is the least.
+            // SwiftUI's frame (fixed width, least height, unbounded height) becomes the window's min and max size.
+            hosting.sizingOptions = [.minSize, .maxSize]
+            window.contentViewController = hosting
+            window.standardWindowButton(.zoomButton)?.isEnabled = false
+            window.collectionBehavior.insert(.fullScreenNone)
             window.title = "HealthBar Settings"
             window.isReleasedWhenClosed = false
-            // Reopens where it was last closed; centred the first time.
-            if !window.setFrameUsingName("Settings") { window.center() }
+            // Reopens where it was last closed (centred the first time), clamped to the allowed size.
+            let restored = window.setFrameUsingName("Settings")
+            let height = max(Self.settingsSize.height, restored ? window.contentRect(forFrameRect: window.frame).height : 0)
+            window.setContentSize(NSSize(width: Self.settingsSize.width, height: height))
+            if !restored { window.center() }
             window.setFrameAutosaveName("Settings")
             settingsWindow = window
         }

@@ -115,3 +115,15 @@ Decisions from a review against Apple's HIG, and what the experiments showed:
 - Of the 59 catalog pages, 15 give no per-day history (checked 2026-11-10): Statuspage pages with uptime display off answer `uptime_showcase` with no timelines (Snyk, Deepgram, DigitalOcean, Linode, MongoDB, Grafana, New Relic, Mailgun, Jira, Figma, Zoom, Dropbox), Cloudflare's answers 404, Mistral's and Replit's `component_impacts` 403. Their rows say "No uptime history" in the strip's place, so a grey strip means only "loading".
 - The menu list's scroller took width from its clip view while the content kept the full width, so it scrolled sideways; the content now matches the clip width.
 - After 0.3.0: the menu list uses the standard overlay scroller (appears while scrolling) instead of an always-visible one, and the cut-off row shows its title and the top edge of its strip. "No uptime history" sits over a 25%-opacity placeholder strip.
+
+## 2026-11-11 — simpler history schedule
+
+Details (incidents and the strip) are read hourly and at once on a status change; the 15-minute schedule while a page is not operational is gone. Status changes already trigger a read, so the extra polls mostly re-read an unchanged incident list.
+
+## 2026-11-11 — Settings polish
+
+- The window can only be made taller (the list grows): width is fixed and the default height (570 pt of content) is the least. Limits come from the SwiftUI frame via `sizingOptions = [.minSize, .maxSize]`; `contentMaxSize` alone left the width free. Zoom is disabled, and a restored frame is clamped. It remembers which groups are folded (`settingsExpandedGroups`).
+- Focus starts in the list, not on the Expand All link (`defaultFocus` plus a deferred set: on macOS 27 the window picked the link as first responder after `onAppear`).
+- The footer hint moved into an ⓘ next to "Services", as a tooltip, the way reLayout puts hints on ⓘ.
+- Import… / Export… read and write the whole config as JSON (`Config.importing` also takes a 0.2.x `services.json`); import replaces after a confirmation.
+- `docs/SERVICES.md` lists the catalog with platform, default and whether each page publishes history; regenerate with `scripts/services-doc.py`.

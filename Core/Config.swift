@@ -112,6 +112,24 @@ public struct Config: Codable, Equatable, Sendable {
         return config
     }
 
+    /// A config from an exported file, or from a 0.2.x `services.json`; catalog pages it lacks are added unchecked.
+    /// - Throws: `DecodingError` when the data is neither.
+    public static func importing(_ data: Data) throws -> Config {
+        if let config = try? JSONDecoder().decode(Config.self, from: data) {
+            var c = config.addingMissing(from: catalog)
+            c.refreshSeconds = snapped(c.refreshSeconds)
+            return c
+        }
+        return imported(try JSONDecoder().decode(Legacy.self, from: data))
+    }
+
+    /// Readable JSON for Export; `importing` reads it back.
+    public func exported() throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        return try encoder.encode(self)
+    }
+
     public func save(to defaults: UserDefaults = .standard) {
         defaults.set(try? JSONEncoder().encode(self), forKey: Self.defaultsKey)
     }

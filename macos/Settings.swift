@@ -39,6 +39,9 @@ final class SettingsModel: ObservableObject {
     }
     #endif
 
+    /// Shows `text` under Launch at Login, where the window's other errors go.
+    func report(_ text: String) { message = text }
+
     func setLaunchAtLogin(_ on: Bool) {
         do {
             if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
@@ -134,8 +137,12 @@ struct SettingsView: View {
 
     init(model: SettingsModel) {
         self.model = model
-        _expanded = State(initialValue: Set(model.config.groups.filter { $0.services.contains(where: \.enabled) }.map(\.id)))
+        let saved = UserDefaults.standard.stringArray(forKey: Self.expandedKey)
+        _expanded = State(initialValue: Set(saved ?? model.config.groups.filter { $0.services.contains(where: \.enabled) }.map(\.id)))
     }
+
+    /// Unfolded groups, kept between openings of the window.
+    private static let expandedKey = "settingsExpandedGroups"
 
     private var allExpanded: Bool { model.config.groups.allSatisfy { expanded.contains($0.id) } }
 
@@ -176,7 +183,15 @@ struct SettingsView: View {
             .scrollDisabled(true)
             .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(width: 480)
+        .frame(width: AppDelegate.settingsSize.width)
+        .frame(minHeight: AppDelegate.settingsSize.height, maxHeight: .infinity)
+        // The list takes the focus first, not the Expand All link; set again after the window picks its first responder.
+        .defaultFocus($listFocused, true)
+        .onAppear {
+            listFocused = true
+            DispatchQueue.main.async { listFocused = true }
+        }
+        .onChange(of: expanded) { UserDefaults.standard.set(Array($0), forKey: Self.expandedKey) }
         .sheet(item: $editingGroup) { draft in
             GroupSheet(group: draft.group, problem: { model.nameProblem($0, for: draft.group?.id) }) { name in
                 if let id = draft.group?.id {
@@ -204,7 +219,13 @@ struct SettingsView: View {
     private var services: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Services").font(.headline)
+                HStack(alignment: .center, spacing: 4) {
+                    Text("Services").font(.headline)
+                    Image(systemName: "info.circle")
+                        .foregroundStyle(.secondary)
+                        .help(Self.servicesHelp)
+                        .accessibilityLabel(Self.servicesHelp)
+                }
                 Spacer()
                 Button(allExpanded ? "Collapse All" : "Expand All") {
                     expanded = allExpanded ? [] : Set(model.config.groups.map(\.id))
@@ -238,21 +259,55 @@ struct SettingsView: View {
                 .onMove { model.config.groups.move(fromOffsets: $0, toOffset: $1) }
             }
             .listStyle(.bordered(alternatesRowBackgrounds: false))
-            .frame(height: 320)
+            .frame(minHeight: 200, maxHeight: .infinity)
             .focused($listFocused)
             .onDeleteCommand(perform: deleteSelected)
             .background(listKeys)
             HStack {
+                Button("Import…", action: importConfig)
+                Button("Export…", action: exportConfig)
                 Spacer()
                 Button("New Group…") { editingGroup = GroupDraft(group: nil) }
                 Button("New Service…") {
                     editing = ServiceDraft(original: nil, address: "", name: "", group: Config.noGroup)
                 }
             }
-            Text("Any Statuspage or incident.io status page. Drag rows to reorder; to move a service to another group, use Move to Group in its context menu. The menu and the icon's sectors follow the order of the checked services.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private static let servicesHelp = "Any Statuspage or incident.io status page. Drag rows to reorder; to move a service to another group, use Move to Group in its context menu. The menu and the icon's sectors follow the order of the checked services."
+
+    /// Writes the whole config (services, groups, interval) as JSON.
+    private func exportConfig() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "HealthBar Settings.json"
+        panel.allowedContentTypes = [.json]
+        guard let window = NSApp.keyWindow else { return }
+        panel.beginSheetModal(for: window) { response in
+            guard response == .OK, let url = panel.url else { return }
+            do { try model.config.exported().write(to: url) } catch { model.report("Export failed: \(error.localizedDescription)") }
+        }
+    }
+
+    /// Replaces the config with an exported file (or a 0.2.x services.json), after a confirmation.
+    private func importConfig() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        guard let window = NSApp.keyWindow else { return }
+        panel.beginSheetModal(for: window) { response in
+            guard response == .OK, let url = panel.url else { return }
+            do {
+                let imported = try Config.importing(Data(contentsOf: url))
+                confirmation = Confirmation(
+                    title: "Replace your services with “\(url.deletingPathExtension().lastPathComponent)”?",
+                    message: "Services, groups and the check interval are replaced by the file’s. This can’t be undone; export first to keep the current ones.",
+                    choices: [Confirmation.Choice(title: "Replace") {
+                        model.config = imported
+                        expanded = Set(imported.groups.filter { $0.services.contains(where: \.enabled) }.map(\.id))
+                    }])
+            } catch {
+                model.report("\(url.lastPathComponent) is not a HealthBar settings file.")
+            }
         }
     }
 

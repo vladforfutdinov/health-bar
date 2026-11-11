@@ -94,10 +94,10 @@ public struct ServiceState: Sendable {
     public init() {}
 }
 
-/// Details are read on a level change, then hourly while the page is fine and every 15 min while it is not.
+/// Details are read hourly, and at once when the level changes.
 public func detailsDue(previous: Level?, current: Level, lastFetch: Date?, now: Date) -> Bool {
     guard let previous, let lastFetch, previous == current else { return true }
-    return now.timeIntervalSince(lastFetch) >= (current == .ok ? 3600 : 900)
+    return now.timeIntervalSince(lastFetch) >= 3600
 }
 
 /// Sectors of the bar icon, clockwise from 12 o'clock. Up to `limit` services: one sector each, in order.

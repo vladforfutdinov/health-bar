@@ -2,7 +2,7 @@
 
 macOS menu bar app showing the status of the services you depend on (GitHub, OpenAI, Claude, Vercel, Supabase by default).
 
-![HealthBar menu: each service with its status and a 30-day uptime strip](assets/screenshot.png)
+<img src="assets/screenshot.png" width="463" alt="HealthBar menu: each service with its status and a 30-day uptime strip">
 
 ## Install
 
@@ -28,14 +28,17 @@ In the menu each service carries its own glyph (`design/status-icons.svg`).
 
 ## Settings
 
-Menu → Settings… (⌘,); Escape closes it. Menu → About HealthBar shows the version.
+<img src="assets/settings.png" width="592" alt="HealthBar Settings: services in groups with checkboxes, the poll interval and Launch at Login">
+
+Menu → Settings… (⌘,); Escape closes it. The window can be made taller; it remembers its position and which groups are folded. Menu → About HealthBar shows the version.
 
 - **Services**: a built-in list of about 60 developer-service status pages in groups (Git, CI; AI; Hosting, cloud; Databases; Packages; Monitoring; Auth, secrets, network; Email, messaging, media; Work tools); GitHub, OpenAI, Claude, Vercel and Supabase are checked by default. Check the ones to show. Services can also sit outside any group, at the top.
   - New Service… / the pencil after a service's address: address, name (empty takes the page's own) and group. The address is checked when the field loses focus (a green check means its `status.json` answers) and again on save. Delete… is in the same sheet, with a confirmation.
   - New Group… / the pencil on a group: its name, and Delete…, which offers Delete Group Only (its services move out of the group) or Delete Group and Services.
   - Drag rows to reorder within a group, and groups among themselves. The context menu has Move Up, Move Down, Move to Group, Edit… and Delete…. Expand All / Collapse All folds the groups. The menu and the icon's sectors follow the order of the checked services.
   - Keyboard: Tab into the list, arrows to move, Space to check a service or fold a group, Return to edit, Delete to delete, ⌥⌘↑/↓ to move.
-  - Deleted built-in pages stay deleted. The list is in `Core/Catalog.swift`.
+  - Deleted built-in pages stay deleted. The full list, with which pages publish uptime history: [docs/SERVICES.md](docs/SERVICES.md).
+  - Import… / Export… save the whole configuration (services, groups, interval) as JSON and load it back; Import also reads a 0.2.x `services.json`.
 - **Check status every**: 30 seconds to 15 minutes.
 - **Launch at Login**.
 - **Updates**: automatic checks and installs, Check Now.
@@ -52,7 +55,7 @@ Eight and a half services show at once, with a scroll bar for the rest. Each ser
 |---|---|---|---|
 | Status | `<url>/api/v2/status.json` | same | every `refreshSeconds` (60) |
 | Incidents | `<url>/api/v2/summary.json` | same | with the strip |
-| Strip | `<url>/uptime_showcase?components=<ids>` (ids and names from the summary) | `<url>/proxy/<host>/component_impacts`, names from `<url>/proxy/<host>` | at launch, on a status change, then hourly (every 15 min while not operational) |
+| Strip | `<url>/uptime_showcase?components=<ids>` (ids and names from the summary) | `<url>/proxy/<host>/component_impacts`, names from `<url>/proxy/<host>` | at launch, then hourly, and at once when the status changes |
 
 The strip endpoints are the pages' own undocumented feeds; if one fails the strip is left out. The platform is detected by `component_impacts` answering 404 on Statuspage hosts.
 

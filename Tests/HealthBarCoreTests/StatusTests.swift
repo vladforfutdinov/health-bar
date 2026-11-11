@@ -180,8 +180,9 @@ final class StatusTests: XCTestCase {
         XCTAssertTrue(due(.degraded, .ok, after: 1), "recovered")
         XCTAssertFalse(due(.ok, .ok, after: 59))
         XCTAssertTrue(due(.ok, .ok, after: 60))
-        XCTAssertFalse(due(.degraded, .degraded, after: 14))
-        XCTAssertTrue(due(.degraded, .degraded, after: 15))
+        XCTAssertFalse(due(.degraded, .degraded, after: 15), "no faster schedule while not OK")
+        XCTAssertFalse(due(.degraded, .degraded, after: 59))
+        XCTAssertTrue(due(.degraded, .degraded, after: 60))
     }
 
     private func scratchDefaults() -> UserDefaults {
@@ -358,6 +359,19 @@ final class StatusTests: XCTestCase {
         XCTAssertEqual(c.groups.prefix(2).map(\.id), ["AI", "Git, CI"])
         c.shiftGroup("AI", by: -1)
         XCTAssertEqual(c.groups.first?.id, "AI", "stops at the top")
+    }
+
+    func testExportImportRoundTrip() throws {
+        var c = Config.default
+        c.refreshSeconds = 300
+        c.groups[0].services[1].enabled = true
+        c.add(ServiceConfig(name: "Solo", url: URL(string: "https://solo.example")!), toGroup: Config.noGroup)
+        c.remove(c.groups[1].services[0].url)
+        XCTAssertEqual(try Config.importing(c.exported()), c)
+
+        let legacy = Data(#"{"refreshSeconds":45,"services":[{"name":"X","url":"https://x.example"}]}"#.utf8)
+        XCTAssertEqual(try Config.importing(legacy).services.map(\.name), ["X"], "0.2.x files import too")
+        XCTAssertThrowsError(try Config.importing(Data("{}".utf8)))
     }
 
     func testPageURLFromTypedText() {
