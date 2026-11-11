@@ -3,17 +3,22 @@
     <channel>
         <title>HealthBar</title>
         <item>
-            <title>0.3.3</title>
-            <pubDate>Wed, 11 Nov 2026 17:05:20 +0000</pubDate>
-            <sparkle:version>32</sparkle:version>
-            <sparkle:shortVersionString>0.3.3</sparkle:shortVersionString>
+            <title>0.3.4</title>
+            <pubDate>Wed, 11 Nov 2026 21:43:14 +0000</pubDate>
+            <sparkle:version>33</sparkle:version>
+            <sparkle:shortVersionString>0.3.4</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description><![CDATA[<h2>Fixes</h2>
+            <description><![CDATA[<h2>Changes</h2>
 <ul>
-<li>Services scrolled into view in the menu no longer show a lighter band across their uptime strip while scrolling (macOS 27, dark menu).</li>
+<li><strong>Check for Updates…</strong> moved back to the menu; the Version / Check Now row left Settings (the version is in About).</li>
+<li>After waking from sleep, checks wait for the network instead of marking every service unreachable.</li>
+<li>The menu bar icon's tooltip counts unreachable services as problems and says "No services" when the list is empty.</li>
+<li>Import drops repeated status page addresses.</li>
+<li>A stored configuration that cannot be read is kept aside instead of being overwritten.</li>
+<li>Less work while the menu is closed: it is rebuilt only when opened, and checks run per service.</li>
 </ul>]]></description>
-            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.3.3/HealthBar.zip" length="1635059" type="application/octet-stream" sparkle:edSignature="9Qgy3S3eQtDlqmBApGJ2uuIV1SP7rD/JKsiwzAlYWJsEgPgwxGU7gBC9I4UB/SkuduvsDmXIM4N3k2IIoa7MCg=="/>
+            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.3.4/HealthBar.zip" length="1632665" type="application/octet-stream" sparkle:edSignature="iRtfrnOSZiAmp3Q9CvjQZyjfe3PJ+oqMEIN+63rT2ThZKYKfq1X3eHVML+CXFHbat0sCG2sT65wQ/eY6LBjJCQ=="/>
         </item>
     </channel>
 </rss>
