@@ -147,3 +147,7 @@ Checked with VoiceOver in the macOS VM (v0.3.4): the icon and Settings read well
 - The menu sends no action for items drawn by a view, on Return or on VoiceOver's press. `ViewMenuItem.perform()` takes both (a hidden Return item, `accessibilityPerformPress`) as well as clicks on its `RowView`. Return through the hidden item closes the menu, Refresh included; a click on Refresh still keeps it open. By the time the hidden Return item runs the menu may report nothing highlighted, so the last highlighted item is tracked.
 - Rows other than services are no longer accessibility elements: an element under a menu item made VoiceOver announce every one as a group to step into. Their shortcut (⌘R…) is no longer spoken, since it lives on a hidden twin.
 - Testing VO-Space by posted ⌃⌥Space failed in the VM because that chord switches the input source there; VoiceOver's AppleScript `perform action` stands in (needs `/private/var/db/Accessibility/.VoiceOverAppleScriptEnabled` and a VoiceOver restart).
+
+## 2026-11-13 — order-free icon
+
+The ring no longer follows the list order with 10 services or fewer: every count uses the rule that applied above 10 — problem statuses first, worst first, in proportion, green for the rest — with as many sectors as services, at most 10. One rule instead of two; the icon no longer changes its logic at the 11th service.

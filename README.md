@@ -12,7 +12,7 @@ brew install --cask vladforfutdinov/healthbar/healthbar
 
 ## Icon
 
-The menu bar icon is a ring (donut) split into one sector per checked service, clockwise from 12 o'clock in the order of the list. With more than 10 services it has 10 sectors: each problem status takes a share proportional to how many services have it (at least one sector), worst first, and green fills the rest. A sector's colour:
+The menu bar icon is a ring (donut) with one sector per checked service, at most 10. Sectors don't follow the list: clockwise from 12 o'clock, each problem status takes a share proportional to how many services have it (at least one sector), worst first, and green fills the rest. A sector's colour:
 
 | Colour | Status |
 |---|---|
@@ -35,7 +35,7 @@ Menu → Settings… (⌘,); Escape closes it. The window can be made taller; it
 - **Services**: a built-in list of about 60 developer-service status pages in groups (Git, CI; AI; Hosting, cloud; Databases; Packages; Monitoring; Auth, secrets, network; Email, messaging, media; Work tools); GitHub, OpenAI, Claude, Vercel and Supabase are checked by default. Check the ones to show. Services can also sit outside any group, at the top.
   - New Service… / the pencil after a service's address: address, name (empty takes the page's own) and group. The address is checked when the field loses focus (a green check means its `status.json` answers) and again on save. Delete… is in the same sheet, with a confirmation.
   - New Group… / the pencil on a group: its name, and Delete…, which offers Delete Group Only (its services move out of the group) or Delete Group and Services.
-  - Drag rows to reorder within a group, and groups among themselves. The context menu has Move Up, Move Down, Move to Group, Edit… and Delete…. Expand All / Collapse All folds the groups. The menu and the icon's sectors follow the order of the checked services.
+  - Drag rows to reorder within a group, and groups among themselves. The context menu has Move Up, Move Down, Move to Group, Edit… and Delete…. Expand All / Collapse All folds the groups. The menu follows the order of the checked services.
   - Keyboard: Tab into the list, arrows to move, Space to check a service or fold a group, Return to edit, Delete to delete, ⌥⌘↑/↓ to move.
   - Deleted built-in pages stay deleted. The full list, with which pages publish uptime history: [docs/SERVICES.md](docs/SERVICES.md).
   - Import… / Export… save the whole configuration (services, groups, interval) as JSON and load it back; Import also reads a 0.2.x `services.json`.

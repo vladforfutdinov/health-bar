@@ -30,7 +30,8 @@ final class StatusTests: XCTestCase {
     }
 
     func testIconSectors() {
-        XCTAssertEqual(iconSectors([.ok, .degraded, nil]), [.ok, .degraded, nil], "up to 10: one per service, in order")
+        XCTAssertEqual(iconSectors([.ok, .degraded, nil]), [.degraded, nil, .ok], "up to 10: one per service, worst first")
+        XCTAssertEqual(iconSectors([]), [])
         let ok = [Level?](repeating: .ok, count: 60)
         XCTAssertEqual(iconSectors(ok), Array(repeating: .ok, count: 10))
         var oneDown = ok

@@ -261,7 +261,7 @@ struct SettingsView: View {
         }
     }
 
-    private static let servicesHelp = "Any Statuspage or incident.io status page. Drag rows to reorder; to move a service to another group, use Move to Group in its context menu. The menu and the icon's sectors follow the order of the checked services."
+    private static let servicesHelp = "Any Statuspage or incident.io status page. Drag rows to reorder; to move a service to another group, use Move to Group in its context menu. The menu follows the order of the checked services."
 
     /// Writes the whole config (services, groups, interval) as JSON.
     private func exportConfig() {
