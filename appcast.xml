@@ -3,19 +3,17 @@
     <channel>
         <title>HealthBar</title>
         <item>
-            <title>0.3.5</title>
-            <pubDate>Wed, 11 Nov 2026 23:11:19 +0000</pubDate>
-            <sparkle:version>34</sparkle:version>
-            <sparkle:shortVersionString>0.3.5</sparkle:shortVersionString>
+            <title>0.3.6</title>
+            <pubDate>Fri, 13 Nov 2026 15:18:23 +0000</pubDate>
+            <sparkle:version>39</sparkle:version>
+            <sparkle:shortVersionString>0.3.6</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description><![CDATA[<h2>Accessibility</h2>
+            <description><![CDATA[<h2>Menu bar icon</h2>
 <ul>
-<li><strong>Keyboard and VoiceOver reach every service in the menu.</strong> The arrow keys move through the services one by one; the selected row lights up and scrolls into view. Return opens its status page.</li>
-<li><strong>VoiceOver</strong> reads each service — name, status, uptime or the current incident — and a summary on the list, such as "1 of 15 services with problems: Snyk". VO-Space opens the page.</li>
-<li>Refresh, About, Check for Updates…, Settings… and Quit are read by name and now respond to Return and VO-Space.</li>
+<li><strong>The ring no longer follows the order of the list.</strong> It has one sector per checked service, at most 10. Clockwise from 12 o'clock come the problems, worst first — outage, degraded, maintenance, unreachable — each taking a share for how many services have it; the rest is green. Reordering services in Settings now changes only the menu.</li>
 </ul>]]></description>
-            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.3.5/HealthBar.zip" length="1635542" type="application/octet-stream" sparkle:edSignature="NAd0iDd99zxGcCOlgTJPy0mEoUFyInoNYd5wJUGjSLIGqEALvuSdAMn2cBLb9BeFbDSGpk21gSKCBiuOL3iLBQ=="/>
+            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.3.6/HealthBar.zip" length="1635524" type="application/octet-stream" sparkle:edSignature="PlqGj8i4oUWv0xKeQquFNe8QOUdfeSGzsXyO2Su4tk56hUXdF4Oloj5vEIYTyNQvnU0NDaSTeik+DMRTLwuoCw=="/>
         </item>
     </channel>
 </rss>
