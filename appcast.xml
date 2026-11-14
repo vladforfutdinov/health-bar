@@ -3,17 +3,17 @@
     <channel>
         <title>HealthBar</title>
         <item>
-            <title>0.3.7</title>
-            <pubDate>Sat, 14 Nov 2026 21:36:52 +0000</pubDate>
-            <sparkle:version>42</sparkle:version>
-            <sparkle:shortVersionString>0.3.7</sparkle:shortVersionString>
+            <title>0.3.8</title>
+            <pubDate>Sat, 14 Nov 2026 23:22:20 +0000</pubDate>
+            <sparkle:version>51</sparkle:version>
+            <sparkle:shortVersionString>0.3.8</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description><![CDATA[<h2>Menu bar icon</h2>
+            <description><![CDATA[<h2>Fixes</h2>
 <ul>
-<li><strong>The ring is a little bigger</strong> — 14 pt across instead of 13, in the same space in the menu bar.</li>
+<li><strong>No empty band on the right of the menu.</strong> With several services in trouble the menu grew wider than its rows; it now fits them.</li>
 </ul>]]></description>
-            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.3.7/HealthBar.zip" length="1635506" type="application/octet-stream" sparkle:edSignature="fU1SSCjpqvITcrxXpHVcqhqs1/a22BkNB8FAoGGCmWgafvrrbOT/+rl8N4crzbuIneweWamm9C5Yoy8ztkuiAA=="/>
+            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.3.8/HealthBar.zip" length="1635763" type="application/octet-stream" sparkle:edSignature="eiG9NHRNCZMQrfk4ebtl1YPd5aE9hC+27WQG54UBtoS2OTUR+fzTl+btJ3tOgkmSmp4/mUle9YGxdqMGunQKBQ=="/>
         </item>
     </channel>
 </rss>
