@@ -147,3 +147,7 @@ Checked with VoiceOver in the macOS VM (v0.3.4): the icon and Settings read well
 - The menu sends no action for items drawn by a view, on Return or on VoiceOver's press. `ViewMenuItem.perform()` takes both (a hidden Return item, `accessibilityPerformPress`) as well as clicks on its `RowView`. Return through the hidden item closes the menu, Refresh included; a click on Refresh still keeps it open. By the time the hidden Return item runs the menu may report nothing highlighted, so the last highlighted item is tracked.
 - Rows other than services are no longer accessibility elements: an element under a menu item made VoiceOver announce every one as a group to step into. Their shortcut (⌘R…) is no longer spoken, since it lives on a hidden twin.
 - Testing VO-Space by posted ⌃⌥Space failed in the VM because that chord switches the input source there; VoiceOver's AppleScript `perform action` stands in (needs `/private/var/db/Accessibility/.VoiceOverAppleScriptEnabled` and a VoiceOver restart).
+
+## 2026-11-14-site
+
+Landing, privacy policy and terms live on the `gh-pages` branch next to `appcast.xml`, served at https://healthbar.forfutdinov.com/ by the feed worker (`/` now serves `index.html`; the feed URL in installed apps is `/appcast.xml`, so nothing changes for Sparkle). Reason: directories and r/macapps ask for a site with a privacy policy and terms.
