@@ -3,17 +3,17 @@
     <channel>
         <title>HealthBar</title>
         <item>
-            <title>0.3.6</title>
-            <pubDate>Fri, 13 Nov 2026 15:18:23 +0000</pubDate>
-            <sparkle:version>39</sparkle:version>
-            <sparkle:shortVersionString>0.3.6</sparkle:shortVersionString>
+            <title>0.3.7</title>
+            <pubDate>Sat, 14 Nov 2026 21:36:52 +0000</pubDate>
+            <sparkle:version>42</sparkle:version>
+            <sparkle:shortVersionString>0.3.7</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <description><![CDATA[<h2>Menu bar icon</h2>
 <ul>
-<li><strong>The ring no longer follows the order of the list.</strong> It has one sector per checked service, at most 10. Clockwise from 12 o'clock come the problems, worst first — outage, degraded, maintenance, unreachable — each taking a share for how many services have it; the rest is green. Reordering services in Settings now changes only the menu.</li>
+<li><strong>The ring is a little bigger</strong> — 14 pt across instead of 13, in the same space in the menu bar.</li>
 </ul>]]></description>
-            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.3.6/HealthBar.zip" length="1635524" type="application/octet-stream" sparkle:edSignature="PlqGj8i4oUWv0xKeQquFNe8QOUdfeSGzsXyO2Su4tk56hUXdF4Oloj5vEIYTyNQvnU0NDaSTeik+DMRTLwuoCw=="/>
+            <enclosure url="https://github.com/vladforfutdinov/health-bar/releases/download/v0.3.7/HealthBar.zip" length="1635506" type="application/octet-stream" sparkle:edSignature="fU1SSCjpqvITcrxXpHVcqhqs1/a22BkNB8FAoGGCmWgafvrrbOT/+rl8N4crzbuIneweWamm9C5Yoy8ztkuiAA=="/>
         </item>
     </channel>
 </rss>
