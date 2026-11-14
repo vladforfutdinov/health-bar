@@ -163,3 +163,7 @@ Landing, privacy policy and terms live on the `gh-pages` branch next to `appcast
 ## 2026-11-14 — menu wider than its rows
 
 The list item's title (the VoiceOver summary, e.g. "2 of 15 services with problems: OpenAI, Claude, Cloudflare") counted toward the menu's width though a view draws the item, leaving an empty band on the right that grew with the number of problems. It gets the same 0.1 pt font as the stand-ins; measured by `NSMenu.size`: 314.9 → 298.9 pt, equal to the list.
+
+## 2026-11-15-catalog-120
+
+The built-in list grows from 68 to 123 pages and gets a Payments, commerce group. Every address was checked live with `scripts/services-doc.py` before it went in; pages whose `summary.json` is blocked for non-browser clients (Datadog) or does not answer (Character.AI, Clarifai) were left out. Pages added to the list appear unchecked for existing installs.

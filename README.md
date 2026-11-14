@@ -38,7 +38,7 @@ In the menu each service carries its own glyph (`design/status-icons.svg`).
 
 Menu → Settings… (⌘,); Escape closes it. The window can be made taller; it remembers its position and which groups are folded. Menu → About HealthBar shows the version.
 
-- **Services**: a built-in list of about 60 developer-service status pages in groups (Git, CI; AI; Hosting, cloud; Databases; Packages; Monitoring; Auth, secrets, network; Email, messaging, media; Work tools); GitHub, OpenAI, Claude, Vercel and Supabase are checked by default. Check the ones to show. Services can also sit outside any group, at the top.
+- **Services**: a built-in list of about 120 developer-service status pages in groups (Git, CI; AI; Hosting, cloud; Databases; Packages; Monitoring; Auth, secrets, network; Email, messaging, media; Payments, commerce; Work tools); GitHub, OpenAI, Claude, Vercel and Supabase are checked by default. Check the ones to show. Services can also sit outside any group, at the top.
   - New Service… / the pencil after a service's address: address, name (empty takes the page's own) and group. The address is checked when the field loses focus (a green check means its `status.json` answers) and again on save. Delete… is in the same sheet, with a confirmation.
   - New Group… / the pencil on a group: its name, and Delete…, which offers Delete Group Only (its services move out of the group) or Delete Group and Services.
   - Drag rows to reorder within a group, and groups among themselves. The context menu has Move Up, Move Down, Move to Group, Edit… and Delete…. Expand All / Collapse All folds the groups. The menu follows the order of the checked services.
