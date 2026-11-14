@@ -159,3 +159,7 @@ The ring grows from 13 to 14 pt inside the same 16 pt image (1 pt margin instead
 ## 2026-11-14-site
 
 Landing, privacy policy and terms live on the `gh-pages` branch next to `appcast.xml`, served at https://healthbar.forfutdinov.com/ by the feed worker (`/` now serves `index.html`; the feed URL in installed apps is `/appcast.xml`, so nothing changes for Sparkle). Reason: directories and r/macapps ask for a site with a privacy policy and terms.
+
+## 2026-11-14 — menu wider than its rows
+
+The list item's title (the VoiceOver summary, e.g. "2 of 15 services with problems: OpenAI, Claude, Cloudflare") counted toward the menu's width though a view draws the item, leaving an empty band on the right that grew with the number of problems. It gets the same 0.1 pt font as the stand-ins; measured by `NSMenu.size`: 314.9 → 298.9 pt, equal to the list.

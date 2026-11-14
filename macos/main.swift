@@ -608,7 +608,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let list = ServiceListView(rows: serviceRows, visibleRows: Self.visibleServices, scroll: listScroll)
             serviceList = list
             list.onScroll = { [weak self] in self?.listScroll = $0 }
-            let item = NSMenuItem(title: summary(rows.map { try? $0.state.status?.get().level }), action: nil, keyEquivalent: "")
+            let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+            item.attributedTitle = NSAttributedString(string: summary(rows.map { try? $0.state.status?.get().level }), attributes: [.font: NSFont.systemFont(ofSize: 0.1)])
             item.view = list
             // Disabled, so the arrow keys skip it and stop on the first stand-in; the view still gets the mouse.
             item.isEnabled = false
