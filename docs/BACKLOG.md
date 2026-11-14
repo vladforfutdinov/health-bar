@@ -16,7 +16,7 @@ Possible support, via the feed:
 
 ## Gaps against Downbar
 
-[Downbar](https://github.com/Ntarasiuk/downbar) is the closest app (MIT source, $2.99 in the App Store, Swift menu bar, 110+ status pages). What it has and HealthBar does not, in the order users will ask:
+[Downbar](https://github.com/Ntarasiuk/downbar) is the closest app (free, MIT, Swift menu bar, 110+ status pages; direct DMG, Homebrew cask and App Store). What it has and HealthBar does not, in the order users will ask:
 
 - Notifications on going down and on recovery, with de-flapping so a single unreachable poll doesn't fire.
 - Webhooks (Slack, Discord, any URL) on status change.
