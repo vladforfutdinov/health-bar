@@ -1,11 +1,11 @@
-// Serves the gh-pages branch (Sparkle appcast) on healthbar.forfutdinov.com.
+// Serves the gh-pages branch (site + Sparkle appcast) on healthbar.forfutdinov.com.
 const ORIGIN = "https://raw.githubusercontent.com/vladforfutdinov/health-bar/gh-pages";
-const TYPES = { xml: "application/xml; charset=utf-8", html: "text/html; charset=utf-8" };
+const TYPES = { xml: "application/xml; charset=utf-8", html: "text/html; charset=utf-8", css: "text/css; charset=utf-8" };
 
 export default {
   async fetch(request) {
     const path = new URL(request.url).pathname;
-    const file = path === "/" ? "/appcast.xml" : path;
+    const file = path === "/" ? "/index.html" : path;
     if (file.includes("..")) return new Response("Bad Request", { status: 400 });
 
     const upstream = await fetch(ORIGIN + file, { cf: { cacheTtl: 60 } });

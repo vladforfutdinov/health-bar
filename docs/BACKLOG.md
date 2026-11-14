@@ -13,3 +13,14 @@ Possible support, via the feed:
 - status: not OK while the newest issue is open; the issue title as the menu row's third line;
 - platform detection: `/api/v2/status.json` 404 and the feed answering;
 - no 30-day strip or uptime percentage: the feed has no per-component history.
+
+## Gaps against Downbar
+
+[Downbar](https://github.com/Ntarasiuk/downbar) is the closest app (free, MIT, Swift menu bar, 110+ status pages; direct DMG, Homebrew cask and App Store). What it has and HealthBar does not, in the order users will ask:
+
+- Notifications on going down and on recovery, with de-flapping so a single unreachable poll doesn't fire.
+- Webhooks (Slack, Discord, any URL) on status change.
+- Per-component watch: on a Statuspage page follow only chosen components, ignore the rest.
+- More sources: Instatus (`summary.json`, Statuspage-like), plain HTTPS reachability of any site, first-party feeds for AWS, Apple, Google Cloud, Azure.
+
+HealthBar's own edges to keep: uptime history from the page itself (30-day strip, worst component per day), the ring icon with a sector per service, incident.io, macOS 13 and Intel, keyboard and VoiceOver.
