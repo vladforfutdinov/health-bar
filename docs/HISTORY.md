@@ -155,3 +155,7 @@ The ring no longer follows the list order with 10 services or fewer: every count
 ## 2026-11-14 — ring size
 
 The ring grows from 13 to 14 pt inside the same 16 pt image (1 pt margin instead of 1.5): it looked small next to other menu bar items. 15 and 16 pt were tried and judged too big; 16 needed a 17 pt image to keep the edge from clipping.
+
+## 2026-11-14 — menu wider than its rows
+
+The list item's title (the VoiceOver summary, e.g. "2 of 15 services with problems: OpenAI, Claude, Cloudflare") counted toward the menu's width though a view draws the item, leaving an empty band on the right that grew with the number of problems. It gets the same 0.1 pt font as the stand-ins; measured by `NSMenu.size`: 314.9 → 298.9 pt, equal to the list.
