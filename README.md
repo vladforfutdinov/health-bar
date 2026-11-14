@@ -2,7 +2,7 @@
 
 macOS menu bar app showing the status of the services you depend on (GitHub, OpenAI, Claude, Vercel, Supabase by default).
 
-<img src="assets/screenshot.png" width="479" alt="HealthBar menu: each service with its status and a 30-day uptime strip">
+<img src="assets/screenshot.png" width="314" alt="HealthBar menu: each service with its status and a 30-day uptime strip">
 
 ## Install
 
@@ -34,7 +34,7 @@ In the menu each service carries its own glyph (`design/status-icons.svg`).
 
 ## Settings
 
-<img src="assets/settings.png" width="592" alt="HealthBar Settings: services in groups with checkboxes, the poll interval and Launch at Login">
+<img src="assets/settings.png" width="480" alt="HealthBar Settings: services in groups with checkboxes, the poll interval and Launch at Login">
 
 Menu → Settings… (⌘,); Escape closes it. The window can be made taller; it remembers its position and which groups are folded. Menu → About HealthBar shows the version.
 
