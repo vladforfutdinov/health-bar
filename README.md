@@ -14,7 +14,7 @@ brew install --cask vladforfutdinov/healthbar/healthbar
 
 The menu bar icon is a ring (donut) with one sector per checked service, at most 10. Sectors don't follow the list: clockwise from 12 o'clock, each problem status takes a share proportional to how many services have it (at least one sector), worst first, and green fills the rest.
 
-<img src="assets/ring.png" width="352" alt="Four menu bar rings: all green; one degraded of 6; outage, maintenance and unreachable among 8; 20 services with problems scaled to 10 sectors">
+<img src="assets/ring.png" width="88" alt="Four menu bar rings: all green; one degraded of 6; outage, maintenance and unreachable among 8; 20 services with problems scaled to 10 sectors">
 
 Left to right: 6 services all OK; 1 of 6 degraded; outage, maintenance and unreachable among 8; 20 services — 2 outages, 4 degraded, 1 maintenance, 1 unreachable — folded into 10 sectors.
 
