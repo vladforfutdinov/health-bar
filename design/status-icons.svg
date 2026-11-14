@@ -12,7 +12,14 @@
    xmlns="http://www.w3.org/2000/svg"
    xmlns:svg="http://www.w3.org/2000/svg">
   <defs
-     id="defs4" />
+     id="defs4">
+    <rect
+       x="54.363798"
+       y="47.629423"
+       width="93.527192"
+       height="33.379789"
+       id="rect96" />
+  </defs>
   <sodipodi:namedview
      id="namedview4"
      pagecolor="#ffffff"
@@ -23,14 +30,14 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      showguides="true"
-     inkscape:zoom="29.852534"
-     inkscape:cx="89.774625"
-     inkscape:cy="39.293147"
-     inkscape:window-width="1581"
+     inkscape:zoom="5.5919566"
+     inkscape:cx="35.050343"
+     inkscape:cy="80.651555"
+     inkscape:window-width="2560"
      inkscape:window-height="1381"
      inkscape:window-x="0"
      inkscape:window-y="31"
-     inkscape:window-maximized="0"
+     inkscape:window-maximized="1"
      inkscape:current-layer="svg4"
      showgrid="false" />
   <g
@@ -205,4 +212,8 @@
        d="m 95.769471,29.008789 a 3,3 0 0 0 -0.460938,0.07227 v 5.837891 a 3,3 0 0 0 0.460938,0.07227 z"
        id="logo5-circle206" />
   </g>
+  <text
+     xml:space="preserve"
+     id="text96"
+     style="text-orientation:auto;-inkscape-font-specification:Georgia;font-family:Georgia;font-size:7.5390501px;paint-order:markers fill stroke;stroke-miterlimit:0;fill:#007aff;stroke:#ffffff;stroke-width:0.03;stroke-linecap:round;stroke-linejoin:round;writing-mode:lr-tb;direction:ltr;stroke-dasharray:none;font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;line-height:0;word-spacing:0px;letter-spacing:0px;white-space:pre;shape-inside:url(#rect96)" />
 </svg>

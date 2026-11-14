@@ -98,11 +98,11 @@ public func detailsDue(previous: Level?, current: Level, lastFetch: Date?, now: 
     return now.timeIntervalSince(lastFetch) >= 3600
 }
 
-/// Sectors of the bar icon, clockwise from 12 o'clock. Up to `limit` services: one sector each, in order.
-/// Beyond that, `limit` sectors: each status other than OK takes a share proportional to how many services have it
-/// (at least one sector when any do), worst first; OK fills the rest. `nil` is not loaded or unreachable.
+/// Sectors of the bar icon, clockwise from 12 o'clock, independent of the services' order: as many as services, at
+/// most `limit`. Each status other than OK takes a share proportional to how many services have it (at least one
+/// sector when any do), worst first; OK fills the rest. `nil` is not loaded or unreachable.
 public func iconSectors(_ levels: [Level?], limit: Int = 10) -> [Level?] {
-    guard levels.count > limit else { return levels }
+    let limit = min(levels.count, limit)
     var sectors: [Level?] = []
     for kind in [Level.outage, .degraded, .maintenance, nil] as [Level?] {
         let count = levels.filter { $0 == kind }.count

@@ -78,7 +78,7 @@ enum Glyph {
         return NSColor(name: nil) { $0.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light }
     }
 
-    /// Menu bar icon: one sector per service, clockwise from 12 o'clock in config order.
+    /// Menu bar icon: one sector per entry, clockwise from 12 o'clock.
     /// Adjacent sectors of one colour are drawn as a single arc, so an all-green bar has no seams.
     /// - Parameters:
     ///   - hole: inner radius as a fraction of the outer one; 0 draws a pie, > 0 a donut.
@@ -87,7 +87,7 @@ enum Glyph {
         let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { r in
             let u = r.width / 16
             let c = NSPoint(x: r.midX, y: r.midY)
-            let disc = r.insetBy(dx: 1.5 * u, dy: 1.5 * u)
+            let disc = r.insetBy(dx: 1, dy: 1)
             let outer = disc.width / 2, inner = outer * hole
             func drawMark() {
                 guard let mark else { return }

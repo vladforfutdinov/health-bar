@@ -148,6 +148,14 @@ Checked with VoiceOver in the macOS VM (v0.3.4): the icon and Settings read well
 - Rows other than services are no longer accessibility elements: an element under a menu item made VoiceOver announce every one as a group to step into. Their shortcut (⌘R…) is no longer spoken, since it lives on a hidden twin.
 - Testing VO-Space by posted ⌃⌥Space failed in the VM because that chord switches the input source there; VoiceOver's AppleScript `perform action` stands in (needs `/private/var/db/Accessibility/.VoiceOverAppleScriptEnabled` and a VoiceOver restart).
 
+## 2026-11-13 — order-free icon
+
+The ring no longer follows the list order with 10 services or fewer: every count uses the rule that applied above 10 — problem statuses first, worst first, in proportion, green for the rest — with as many sectors as services, at most 10. One rule instead of two; the icon no longer changes its logic at the 11th service.
+
+## 2026-11-14 — ring size
+
+The ring grows from 13 to 14 pt inside the same 16 pt image (1 pt margin instead of 1.5): it looked small next to other menu bar items. 15 and 16 pt were tried and judged too big; 16 needed a 17 pt image to keep the edge from clipping.
+
 ## 2026-11-14-site
 
 Landing, privacy policy and terms live on the `gh-pages` branch next to `appcast.xml`, served at https://healthbar.forfutdinov.com/ by the feed worker (`/` now serves `index.html`; the feed URL in installed apps is `/appcast.xml`, so nothing changes for Sparkle). Reason: directories and r/macapps ask for a site with a privacy policy and terms.
