@@ -1,0 +1,20 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><title>HealthBar Privacy Policy</title></head><body><main>
+<h1>Privacy Policy</h1>
+<p class="sub">HealthBar for macOS. Effective 14 November 2026.</p>
+<h2>What the app collects</h2>
+<p>Nothing. HealthBar has no accounts, no analytics, no crash reporting and no telemetry. It does not send anything about you, your Mac or your usage to the author or to anyone else.</p>
+<h2>Network requests</h2>
+<p>The app makes requests to two kinds of hosts, and no others:</p>
+<ul>
+<li><strong>The status pages you enabled.</strong> At the interval you set (30 seconds to 15 minutes) the app fetches each enabled page's public status, incident and uptime endpoints. Those pages are run by their respective companies (Atlassian Statuspage, incident.io, or the service itself) and see an ordinary HTTP request from your Mac, as a browser visit would. Their own privacy policies apply to them.</li>
+<li><strong>The update feed</strong> at <code>healthbar.forfutdinov.com</code>, checked by the Sparkle framework when automatic updates are on. The request carries the app name and version in its User-Agent and nothing else; Sparkle's system profile reporting is disabled. The feed is served through Cloudflare, which may log requests under its own policy. Updates are downloaded from GitHub Releases.</li>
+</ul>
+<h2>What stays on your Mac</h2>
+<p>Your list of services, groups, the poll interval, window positions and the Launch at Login setting are stored in the app's user defaults on your Mac. Import and Export read and write a JSON file where you choose. Nothing is synced.</p>
+<h2>Permissions</h2>
+<p>The app asks for no macOS permissions. It uses the standard Launch at Login mechanism when you turn it on.</p>
+<h2>Changes</h2>
+<p>If this policy changes, the new version is published at this address with a new effective date.</p>
+<h2>Contact</h2>
+<p>Questions: <a href="https://github.com/vladforfutdinov/health-bar/issues">GitHub Issues</a>.</p>
+<nav><a href="/">HealthBar</a><a href="https://github.com/vladforfutdinov/health-bar">Source</a><a href="https://github.com/vladforfutdinov/health-bar/releases">Releases</a><a href="https://github.com/vladforfutdinov/health-bar/issues">Issues</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a></nav></main></body></html>
